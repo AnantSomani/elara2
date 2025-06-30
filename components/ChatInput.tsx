@@ -5,11 +5,11 @@ import { sendQuestion } from '../lib/api';
 
 interface ChatInputProps {
   episodeId: string;
-  onResponse: (audioUrl: string) => void;
+  onSendMessage: (message: string) => void;
   isProcessing: boolean;
 }
 
-export default function ChatInput({ episodeId, onResponse, isProcessing }: ChatInputProps) {
+export default function ChatInput({ episodeId, onSendMessage, isProcessing }: ChatInputProps) {
   const [question, setQuestion] = useState('');
   
   const {
@@ -38,24 +38,12 @@ export default function ChatInput({ episodeId, onResponse, isProcessing }: ChatI
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!question.trim()) return;
-
-    try {
-      setIsProcessing(true);
-      const response = await sendQuestion(episodeId, question);
-      
-      // Clear the input
-      setQuestion('');
-      
-      // Notify parent with the response audio URL
-      onResponse(response.audioUrl);
-    } catch (error) {
-      console.error('Error sending question:', error);
-      Alert.alert('Error', 'Failed to process your question. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
+    
+    onSendMessage(question.trim());
+    setQuestion('');
+    clearRecording();
   };
 
   const formatDuration = (seconds: number) => {
