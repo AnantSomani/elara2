@@ -1,81 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from '../hooks';
 
 interface ResponseAudioProps {
   audioUrl: string;
+  hostName?: string;
 }
 
-export default function ResponseAudio({ audioUrl }: ResponseAudioProps) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+export default function ResponseAudio({ audioUrl, hostName }: ResponseAudioProps) {
+  const {
+    isPlaying,
+    isLoading,
+    loadAudio,
+    togglePlayback,
+  } = useAudioPlayer();
 
   useEffect(() => {
     // Auto-play the response when it arrives
-    playResponse();
-    
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
+    if (audioUrl) {
+      loadAudio(audioUrl)
+        .then(() => {
+          // Auto-play after loading
+          togglePlayback();
+        })
+        .catch(error => {
+          console.error('Error loading response audio:', error);
+        });
+    }
   }, [audioUrl]);
-
-  const playResponse = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Unload previous sound if exists
-      if (sound) {
-        await sound.unloadAsync();
-      }
-
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        { shouldPlay: true }
-      );
-      
-      setSound(newSound);
-      
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          setIsPlaying(status.isPlaying);
-          
-          // Reset when playback finishes
-          if (status.didJustFinish) {
-            setIsPlaying(false);
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Error playing response audio:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const togglePlayback = async () => {
-    if (!sound) {
-      await playResponse();
-      return;
-    }
-
-    try {
-      if (isPlaying) {
-        await sound.pauseAsync();
-      } else {
-        await sound.playAsync();
-      }
-    } catch (error) {
-      console.error('Error toggling response playback:', error);
-    }
-  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>🎙️ Host Response</Text>
+        <Text style={styles.title}>
+          🎙️ {hostName ? `${hostName} responds` : 'Host Response'}
+        </Text>
         <Text style={styles.subtitle}>Powered by ElevenLabs voice synthesis</Text>
       </View>
       

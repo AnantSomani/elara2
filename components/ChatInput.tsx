@@ -1,62 +1,40 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Audio } from 'expo-av';
-import * as Speech from 'expo-speech';
+import { useVoiceRecording } from '../hooks';
 import { sendQuestion } from '../lib/api';
 
 interface ChatInputProps {
   episodeId: string;
   onResponse: (audioUrl: string) => void;
+  isProcessing: boolean;
 }
 
-export default function ChatInput({ episodeId, onResponse }: ChatInputProps) {
+export default function ChatInput({ episodeId, onResponse, isProcessing }: ChatInputProps) {
   const [question, setQuestion] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  
+  const {
+    isRecording,
+    recordingUri,
+    duration,
+    startRecording,
+    stopRecording,
+    clearRecording,
+  } = useVoiceRecording();
 
-  const startRecording = async () => {
-    try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission required', 'Please grant microphone permission to use voice input');
-        return;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      
-      setRecording(newRecording);
-      setIsRecording(true);
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      Alert.alert('Error', 'Failed to start recording');
-    }
-  };
-
-  const stopRecording = async () => {
-    if (!recording) return;
-
-    try {
-      setIsRecording(false);
-      await recording.stopAndUnloadAsync();
-      
-      const uri = recording.getURI();
+  const handleVoiceInput = async () => {
+    if (isRecording) {
+      const uri = await stopRecording();
       if (uri) {
-        // In a real implementation, you'd send this to a speech-to-text service
-        // For now, we'll use a placeholder
-        setQuestion('Voice input received - implement speech-to-text');
+        // TODO: Implement speech-to-text conversion
+        // For now, we'll set a placeholder message
+        setQuestion('Voice input received - implement speech-to-text conversion');
+        Alert.alert(
+          'Voice Recording Complete',
+          'Speech-to-text conversion will be implemented with a service like OpenAI Whisper or Google Speech-to-Text.'
+        );
       }
-      
-      setRecording(null);
-    } catch (error) {
-      console.error('Failed to stop recording:', error);
+    } else {
+      await startRecording();
     }
   };
 
@@ -80,6 +58,12 @@ export default function ChatInput({ episodeId, onResponse }: ChatInputProps) {
     }
   };
 
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.inputContainer}>
@@ -90,12 +74,13 @@ export default function ChatInput({ episodeId, onResponse }: ChatInputProps) {
           onChangeText={setQuestion}
           multiline
           maxLength={500}
+          editable={!isProcessing}
         />
         
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[styles.voiceButton, isRecording && styles.voiceButtonActive]}
-            onPress={isRecording ? stopRecording : startRecording}
+            onPress={handleVoiceInput}
             disabled={isProcessing}
           >
             <Text style={styles.buttonText}>
@@ -114,6 +99,25 @@ export default function ChatInput({ episodeId, onResponse }: ChatInputProps) {
           </TouchableOpacity>
         </View>
       </View>
+      
+      {isRecording && (
+        <View style={styles.recordingIndicator}>
+          <Text style={styles.recordingText}>
+            🔴 Recording... {formatDuration(duration)}
+          </Text>
+        </View>
+      )}
+      
+      {recordingUri && !isRecording && (
+        <View style={styles.recordingComplete}>
+          <Text style={styles.recordingCompleteText}>
+            ✅ Voice recording complete ({formatDuration(duration)})
+          </Text>
+          <TouchableOpacity onPress={clearRecording} style={styles.clearButton}>
+            <Text style={styles.clearButtonText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -173,5 +177,47 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 18,
+  },
+  recordingIndicator: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  recordingText: {
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  recordingComplete: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recordingCompleteText: {
+    color: '#1e40af',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  clearButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#1e40af',
+    borderRadius: 4,
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
 }); 

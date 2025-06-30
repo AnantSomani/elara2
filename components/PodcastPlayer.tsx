@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from '../hooks';
 
 interface PodcastPlayerProps {
   title: string;
@@ -9,60 +9,22 @@ interface PodcastPlayerProps {
 }
 
 export default function PodcastPlayer({ title, audioUrl, hosts }: PodcastPlayerProps) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const {
+    isPlaying,
+    isLoading,
+    position,
+    duration,
+    loadAudio,
+    togglePlayback,
+  } = useAudioPlayer();
 
   useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
-
-  const loadAudio = async () => {
-    try {
-      setIsLoading(true);
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        { shouldPlay: false }
-      );
-      
-      setSound(newSound);
-      
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          setPosition(status.positionMillis || 0);
-          setDuration(status.durationMillis || 0);
-          setIsPlaying(status.isPlaying);
-        }
+    if (audioUrl) {
+      loadAudio(audioUrl).catch(error => {
+        console.error('Error loading podcast audio:', error);
       });
-    } catch (error) {
-      console.error('Error loading audio:', error);
-    } finally {
-      setIsLoading(false);
     }
-  };
-
-  const togglePlayback = async () => {
-    if (!sound) {
-      await loadAudio();
-      return;
-    }
-
-    try {
-      if (isPlaying) {
-        await sound.pauseAsync();
-      } else {
-        await sound.playAsync();
-      }
-    } catch (error) {
-      console.error('Error toggling playback:', error);
-    }
-  };
+  }, [audioUrl]);
 
   const formatTime = (milliseconds: number) => {
     const minutes = Math.floor(milliseconds / 60000);
