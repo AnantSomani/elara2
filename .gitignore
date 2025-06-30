@@ -1,0 +1,66 @@
+# Expo
+.expo/
+dist/
+web-build/
+
+# React Native
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Metro
+.metro-health-check*
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.history/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build artifacts
+android/app/build/
+ios/build/
+*.xcworkspace/xcuserdata
+*.xcodeproj/xcuserdata
+
+# CocoaPods
+ios/Pods/
+ios/Podfile.lock
+
+# Android
+android/.gradle
+android/build/
+android/app/build/
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/res/drawable-*
+
+# Generated files
+*.jsbundle
+
+# TypeScript
+*.tsbuildinfo 
