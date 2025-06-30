@@ -1,0 +1,56 @@
+name: Podcast Processing Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      podcast_url:
+        description: 'Podcast episode URL to process'
+        required: true
+        type: string
+      episode_id:
+        description: 'Episode ID from Supabase'
+        required: true
+        type: string
+  
+  repository_dispatch:
+    types: [process-podcast]
+
+jobs:
+  process-podcast:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install whisperx torch torchaudio
+        pip install pyannote.audio
+        pip install openai supabase python-dotenv
+        
+    - name: Process podcast episode
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      run: |
+        python scripts/process_podcast.py \
+          --url "${{ github.event.inputs.podcast_url || github.event.client_payload.podcast_url }}" \
+          --episode-id "${{ github.event.inputs.episode_id || github.event.client_payload.episode_id }}"
+          
+    - name: Update processing status
+      if: always()
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      run: |
+        python scripts/update_status.py \
+          --episode-id "${{ github.event.inputs.episode_id || github.event.client_payload.episode_id }}" \
+          --status "${{ job.status == 'success' && 'completed' || 'failed' }}" 
