@@ -1,0 +1,14 @@
+{
+  "name": "elara-test-scripts",
+  "version": "1.0.0",
+  "description": "Test scripts for ElaraV2 backend processing",
+  "main": "test_database.js",
+  "scripts": {
+    "test-db": "node test_database.js",
+    "test-search": "node semantic_search_test.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "openai": "^4.24.1"
+  }
+} 

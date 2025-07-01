@@ -24,21 +24,47 @@ export interface SegmentData {
   embedding?: number[];
 }
 
+export interface CreateEpisodeData {
+  youtubeUrl: string;
+  title: string;
+  description?: string;
+  durationSeconds: number;
+  thumbnailUrl?: string;
+  channelTitle?: string;
+}
+
 /**
- * Create a new episode record in Supabase
+ * Create a new episode record in Supabase with YouTube metadata
  */
-export async function createEpisode(podcastLink: string): Promise<string> {
+export async function createEpisode(episodeData: CreateEpisodeData): Promise<string> {
+  console.log('🔍 Creating episode record:', {
+    title: episodeData.title,
+    duration: `${Math.floor(episodeData.durationSeconds / 60)}:${(episodeData.durationSeconds % 60).toString().padStart(2, '0')}`,
+    channel: episodeData.channelTitle,
+  });
+  
   const { data, error } = await supabase
     .from('episodes')
     .insert({
-      original_url: podcastLink,
+      youtube_url: episodeData.youtubeUrl,
+      title: episodeData.title,
+      description: episodeData.description,
+      duration_seconds: episodeData.durationSeconds,
       processing_status: 'pending',
       created_at: new Date().toISOString(),
     })
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('🚨 Supabase error details:', error);
+    console.error('🚨 Error code:', error.code);
+    console.error('🚨 Error message:', error.message);
+    console.error('🚨 Error hint:', error.hint);
+    throw error;
+  }
+  
+  console.log('✅ Episode created successfully with ID:', data.id);
   return data.id;
 }
 

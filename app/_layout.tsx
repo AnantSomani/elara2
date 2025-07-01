@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Hide the splash screen once the app is ready
+    SplashScreen.hideAsync();
+  }, []);
+
   return (
     <>
       <StatusBar style="auto" />
@@ -11,16 +17,14 @@ export default function RootLayout() {
           name="index" 
           options={{ 
             title: 'ElaraV2',
-            headerStyle: { backgroundColor: '#f4f4f5' },
-            headerTitleStyle: { fontWeight: 'bold' }
+            headerShown: true
           }} 
         />
         <Stack.Screen 
           name="[episode]/index" 
           options={{ 
             title: 'Podcast Assistant',
-            headerStyle: { backgroundColor: '#f4f4f5' },
-            headerBackTitle: 'Back'
+            headerShown: true
           }} 
         />
       </Stack>

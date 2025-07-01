@@ -30,7 +30,13 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      [
+        "expo-router",
+        {
+          "root": "./app"
+        }
+      ],
+      "expo-web-browser"
     ],
     "scheme": "elara-v2",
     "permissions": [
@@ -39,4 +45,4 @@
       "android.permission.MODIFY_AUDIO_SETTINGS"
     ]
   }
-} 
+}

@@ -1,31 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { router } from 'expo-router';
-import { processPodcastLink } from '../lib/api';
+import { processPodcastLink, type ProcessResult } from '../lib/api';
+import { type YouTubeVideoData } from '../lib/youtube';
 
 export default function HomePage() {
   const [podcastLink, setPodcastLink] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [videoData, setVideoData] = useState<YouTubeVideoData | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const handleSubmit = async () => {
     if (!podcastLink.trim()) {
-      Alert.alert('Error', 'Please enter a podcast link');
+      Alert.alert('Error', 'Please enter a YouTube URL');
       return;
     }
 
     try {
       setIsLoading(true);
-      // Process the podcast link and get episode ID
-      const episodeId = await processPodcastLink(podcastLink);
+      // Process the YouTube URL and get video metadata + episode ID
+      const result: ProcessResult = await processPodcastLink(podcastLink);
       
-      // Navigate to the episode page
-      router.push(`/${episodeId}`);
+      // Show video preview and ask for confirmation
+      setVideoData(result.videoData);
+      setIsConfirming(true);
+      
+      // Auto-navigate after showing preview (or user can manually confirm)
+      setTimeout(() => {
+        router.push(`/${result.episodeId}`);
+      }, 2000);
+      
     } catch (error) {
-      Alert.alert('Error', 'Failed to process podcast link. Please try again.');
+      Alert.alert('Error', 'Failed to process YouTube URL. Please try again.');
       console.error('Error processing podcast:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleConfirmAndNavigate = () => {
+    if (videoData) {
+      // Extract episode ID from the most recent processing
+      // For now, we'll handle this in a simpler way
+      setIsConfirming(false);
+      setVideoData(null);
+      setPodcastLink('');
+    }
+  };
+
+  const handleCancel = () => {
+    setIsConfirming(false);
+    setVideoData(null);
   };
 
   return (
@@ -36,28 +61,64 @@ export default function HomePage() {
           AI-powered podcast assistant with host voice synthesis
         </Text>
         
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Podcast Link</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Paste your podcast episode link here..."
-            value={podcastLink}
-            onChangeText={setPodcastLink}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </View>
+        {!isConfirming && (
+          <>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>YouTube URL</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Paste your YouTube video URL here..."
+                value={podcastLink}
+                onChangeText={setPodcastLink}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </View>
 
-        <TouchableOpacity 
-          style={[styles.button, isLoading && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={isLoading}
-        >
-          <Text style={styles.buttonText}>
-            {isLoading ? 'Processing...' : 'Start Conversation'}
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.button, isLoading && styles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={isLoading}
+            >
+              <Text style={styles.buttonText}>
+                {isLoading ? 'Processing...' : 'Start Conversation'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {isConfirming && videoData && (
+          <View style={styles.videoPreview}>
+            <Text style={styles.previewTitle}>Video Found!</Text>
+            
+            {videoData.thumbnailUrl && (
+              <Image 
+                source={{ uri: videoData.thumbnailUrl }} 
+                style={styles.thumbnail}
+                resizeMode="cover"
+              />
+            )}
+            
+            <Text style={styles.videoTitle}>{videoData.title}</Text>
+            <Text style={styles.videoInfo}>
+              {videoData.channelTitle} • {Math.floor(videoData.durationSeconds / 60)}:{(videoData.durationSeconds % 60).toString().padStart(2, '0')}
+            </Text>
+            
+            <Text style={styles.statusText}>
+              ✅ Processing started! Redirecting to conversation...
+            </Text>
+            
+            <View style={styles.buttonRow}>
+              <TouchableOpacity 
+                style={[styles.button, styles.cancelButton]}
+                onPress={handleCancel}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <View style={styles.featuresContainer}>
           <Text style={styles.featuresTitle}>Features:</Text>
@@ -145,5 +206,60 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 4,
     lineHeight: 20,
+  },
+  videoPreview: {
+    backgroundColor: '#f0f9ff',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginBottom: 20,
+  },
+  previewTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  thumbnail: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  videoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+    lineHeight: 22,
+  },
+  videoInfo: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  statusText: {
+    fontSize: 14,
+    color: '#059669',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontWeight: '500',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#ef4444',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 }); 

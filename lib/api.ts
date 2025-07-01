@@ -1,15 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
-import { createEpisode, getEpisode, searchSegments, type EpisodeData } from './supabase';
+import { createEpisode, getEpisode, searchSegments, supabase, type EpisodeData, type CreateEpisodeData } from './supabase';
 import { generateEmbedding, generateHostResponse } from './openai';
 import { rewriteQuestion } from './claude';
 import { synthesizeSpeech, getHostVoiceId, getHostVoiceSettings } from './elevenlabs';
 import { getHostPrompt } from '../constants/prompts';
+import { processYouTubeUrl, type YouTubeVideoData } from './youtube';
 
-// Initialize Supabase client
+// Get environment variables for debugging
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
-export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // API endpoints
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || '';
@@ -22,21 +21,53 @@ export interface QuestionResponse {
   hostVoice: string;
 }
 
+export interface ProcessResult {
+  episodeId: string;
+  videoData: YouTubeVideoData;
+}
+
 /**
- * Process a podcast link and return episode ID
+ * Process a YouTube URL with proper validation and metadata fetching
  */
-export async function processPodcastLink(podcastLink: string): Promise<string> {
+export async function processPodcastLink(youtubeUrl: string): Promise<ProcessResult> {
   try {
-    // Create episode record in Supabase
-    const episodeId = await createEpisode(podcastLink);
+    console.log('🔗 Processing YouTube URL:', youtubeUrl);
+    console.log('🔐 Supabase URL:', supabaseUrl ? 'Connected' : 'Missing');
+    console.log('🔑 YouTube API Key:', process.env.EXPO_PUBLIC_YOUTUBE_API_KEY ? 'Set' : 'Missing');
     
-    // TODO: Trigger backend processing
-    await triggerPodcastProcessing(episodeId, podcastLink);
+    // Step 1: Fetch and validate YouTube video metadata
+    console.log('📺 Fetching YouTube video metadata...');
+    const videoData = await processYouTubeUrl(youtubeUrl);
+    console.log('✅ Video metadata retrieved:', videoData.title);
     
-    return episodeId;
+    // Step 2: Create episode record with proper data
+    console.log('📝 Creating episode record in database...');
+    const episodeData: CreateEpisodeData = {
+      youtubeUrl: youtubeUrl,
+      title: videoData.title,
+      description: videoData.description,
+      durationSeconds: videoData.durationSeconds,
+      thumbnailUrl: videoData.thumbnailUrl,
+      channelTitle: videoData.channelTitle,
+    };
+    
+    const episodeId = await createEpisode(episodeData);
+    console.log('✅ Episode created with ID:', episodeId);
+    
+    // Step 3: Trigger backend processing
+    console.log('🚀 Triggering backend processing...');
+    await triggerPodcastProcessing(episodeId, youtubeUrl);
+    console.log('✅ Processing triggered successfully');
+    
+    return {
+      episodeId,
+      videoData,
+    };
   } catch (error) {
-    console.error('Error processing podcast link:', error);
-    throw new Error('Failed to process podcast link');
+    console.error('❌ Error processing YouTube URL:', error);
+    console.error('❌ Error details:', JSON.stringify(error, null, 2));
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to process YouTube URL: ${errorMessage}`);
   }
 }
 
@@ -48,7 +79,8 @@ export async function getEpisodeData(episodeId: string): Promise<EpisodeData> {
     return await getEpisode(episodeId);
   } catch (error) {
     console.error('Error fetching episode data:', error);
-    throw new Error('Failed to fetch episode data');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to fetch episode data: ${errorMessage}`);
   }
 }
 
@@ -104,7 +136,8 @@ export async function sendQuestion(
     };
   } catch (error) {
     console.error('Error processing question:', error);
-    throw new Error('Failed to process question');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to process question: ${errorMessage}`);
   }
 }
 
@@ -127,6 +160,5 @@ async function triggerPodcastProcessing(episodeId: string, podcastLink: string):
   // }
 }
 
-// Re-export types and utilities for convenience
-export type { EpisodeData } from './supabase';
-export { supabase } from './supabase'; 
+// Re-export types for convenience
+export type { EpisodeData } from './supabase'; 
