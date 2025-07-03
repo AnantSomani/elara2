@@ -1,40 +1,49 @@
 #!/usr/bin/env python3
 """
-Background podcast processing agent
-Handles transcription, diarization, and embedding generation
+Background podcast processing agent with AssemblyAI
+Handles transcription, speaker diarization, and embedding generation
 """
 
 import os
 import sys
 import argparse
 import asyncio
-from typing import List, Dict, Any
+import time
+from typing import List, Dict, Any, Optional
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv('.env.local')
+load_dotenv('.env')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
-    import whisperx
-    import torch
-    from pyannote.audio import Pipeline
+    import assemblyai as aai
     import openai
     from supabase import create_client, Client
     import yt_dlp
-    from pydub import AudioSegment
 except ImportError as e:
     logger.error(f"Missing dependency: {e}")
+    logger.error("Install with: pip install assemblyai openai supabase yt-dlp")
     sys.exit(1)
 
-class PodcastProcessor:
+class AssemblyAIPodcastProcessor:
     def __init__(self):
+        # Initialize AssemblyAI
+        aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
+        if not aai.settings.api_key:
+            raise ValueError("ASSEMBLYAI_API_KEY environment variable is required")
+        
+        # Initialize other clients
         self.openai_client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         self.supabase: Client = create_client(
-            os.getenv('SUPABASE_URL'),
-            os.getenv('SUPABASE_SERVICE_KEY')
+            os.getenv('EXPO_PUBLIC_SUPABASE_URL'),
+            os.getenv('SUPABASE_SERVICE_ROLE_KEY')
         )
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
     async def download_audio(self, url: str, output_path: str) -> str:
         """Download audio from podcast URL"""
@@ -53,54 +62,117 @@ class PodcastProcessor:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
             
-        return output_path.replace('.%(ext)s', '.wav')
+        # yt-dlp converts the file to .wav, so return the wav path
+        wav_path = f"{output_path}.wav"
+        return wav_path
     
-    async def transcribe_audio(self, audio_path: str) -> Dict[str, Any]:
-        """Transcribe audio using WhisperX"""
-        logger.info("Starting transcription...")
+    async def transcribe_with_assemblyai(self, audio_path: str) -> Any:
+        """Transcribe and diarize audio using AssemblyAI"""
+        logger.info("Starting AssemblyAI transcription with speaker diarization...")
         
-        # Load WhisperX model
-        model = whisperx.load_model("large-v2", self.device)
+        # Configure transcription settings
+        config = aai.TranscriptionConfig(
+            # Core features
+            speaker_labels=True,  # Enable speaker diarization
+            speakers_expected=4,  # Expected number of speakers
+            
+            # Enhanced features
+            auto_chapters=True,   # Auto-detect chapters
+            entity_detection=True,  # Detect names, companies, etc.
+            iab_categories=True,  # Content categorization
+            
+            # Quality settings
+            language_code="en_us",
+            punctuate=True,
+            format_text=True,
+            
+            # Boost important words for better accuracy
+            word_boost=[
+                "Chamath", "Palihapitiya", "Sacks", "David", "Friedberg", 
+                "Jason", "Calacanis", "All-In", "SPAC", "IPO", "SaaS", 
+                "AI", "ML", "cryptocurrency", "venture capital", "startup"
+            ],
+            boost_param="high"
+        )
         
-        # Load audio
-        audio = whisperx.load_audio(audio_path)
+        # Start transcription
+        transcriber = aai.Transcriber(config=config)
+        transcript = transcriber.transcribe(audio_path)
         
-        # Transcribe
-        result = model.transcribe(audio, batch_size=16)
+        # Wait for completion
+        logger.info(f"Transcription queued with ID: {transcript.id}")
         
-        return result
+        while transcript.status not in [aai.TranscriptStatus.completed, aai.TranscriptStatus.error]:
+            await asyncio.sleep(10)
+            transcript = transcriber.get_transcript(transcript.id)
+            logger.info(f"Transcription status: {transcript.status}")
+        
+        if transcript.status == aai.TranscriptStatus.error:
+            raise Exception(f"AssemblyAI transcription failed: {transcript.error}")
+        
+        logger.info("Transcription completed successfully")
+        return transcript
     
-    async def diarize_speakers(self, audio_path: str, transcription: Dict) -> Dict[str, Any]:
-        """Perform speaker diarization using pyannote"""
-        logger.info("Starting speaker diarization...")
+    def extract_segments_with_speakers(self, transcript) -> List[Dict]:
+        """Extract segments with speaker labels and timestamps"""
+        segments = []
         
-        # Load diarization pipeline
-        pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token=os.getenv('HUGGINGFACE_TOKEN')
-        )
+        for utterance in transcript.utterances:
+            # Extract word-level details if available
+            words = []
+            if hasattr(utterance, 'words') and utterance.words:
+                for word in utterance.words:
+                    words.append({
+                        'text': word.text,
+                        'start': word.start / 1000.0,
+                        'end': word.end / 1000.0,
+                        'confidence': word.confidence
+                    })
+            
+            segment = {
+                'text': utterance.text,
+                'speaker': f"Speaker_{utterance.speaker}",  # Simple speaker labeling
+                'start': utterance.start / 1000.0,  # Convert to seconds
+                'end': utterance.end / 1000.0,
+                'confidence': getattr(utterance, 'confidence', 0.9),
+                'words': words,
+                'segment_type': 'utterance',
+                'language_code': 'en'
+            }
+            segments.append(segment)
         
-        # Run diarization
-        diarization = pipeline(audio_path)
+        return segments
+    
+    def extract_chapters(self, transcript) -> List[Dict]:
+        """Extract auto-detected chapters from AssemblyAI"""
+        chapters = []
         
-        # Align with transcription
-        model_a, metadata = whisperx.load_align_model(
-            language_code=transcription["language"], 
-            device=self.device
-        )
+        if hasattr(transcript, 'chapters') and transcript.chapters:
+            for chapter in transcript.chapters:
+                chapters.append({
+                    'start': chapter.start / 1000.0,
+                    'end': chapter.end / 1000.0,
+                    'headline': chapter.headline,
+                    'summary': chapter.summary,
+                    'gist': chapter.gist
+                })
         
-        result = whisperx.align(
-            transcription["segments"], 
-            model_a, 
-            metadata, 
-            audio_path, 
-            self.device
-        )
+        return chapters
+    
+    def extract_entities(self, transcript) -> List[Dict]:
+        """Extract detected entities from AssemblyAI"""
+        entities = []
         
-        # Assign speakers
-        result = whisperx.assign_word_speakers(diarization, result)
+        if hasattr(transcript, 'entities') and transcript.entities:
+            for entity in transcript.entities:
+                entities.append({
+                    'text': entity.text,
+                    'entity_type': entity.entity_type,
+                    'start': entity.start / 1000.0,
+                    'end': entity.end / 1000.0
+                })
         
-        return result
+        return entities
     
     async def generate_embeddings(self, segments: List[Dict]) -> List[Dict]:
         """Generate embeddings for text segments"""
@@ -109,7 +181,7 @@ class PodcastProcessor:
         embeddings_data = []
         
         for segment in segments:
-            if 'text' in segment and segment['text'].strip():
+            if segment['text'].strip():
                 try:
                     response = self.openai_client.embeddings.create(
                         model="text-embedding-3-small",
@@ -118,28 +190,68 @@ class PodcastProcessor:
                     
                     embeddings_data.append({
                         'content': segment['text'],
-                        'speaker': segment.get('speaker', 'Unknown'),
-                        'timestamp_start': segment.get('start', 0),
-                        'timestamp_end': segment.get('end', 0),
-                        'embedding': response.data[0].embedding
+                        'speaker': segment['speaker'],
+                        'timestamp_start': segment['start'],
+                        'timestamp_end': segment['end'],
+                        'embedding': response.data[0].embedding,
+                        'confidence': segment.get('confidence', 0.9),
+                        'words': segment.get('words', []),
+                        'segment_type': segment.get('segment_type', 'utterance'),
+                        'language_code': segment.get('language_code', 'en')
                     })
                     
                 except Exception as e:
-                    logger.error(f"Error generating embedding: {e}")
+                    logger.error(f"Error generating embedding for segment: {e}")
                     continue
                     
         return embeddings_data
     
-    async def save_to_supabase(self, episode_id: str, segments: List[Dict], full_transcript: str):
-        """Save processed data to Supabase"""
+    def get_processing_metadata(self, transcript) -> Dict:
+        """Extract processing metadata from AssemblyAI"""
+        return {
+            'assemblyai_transcript_id': transcript.id,
+            'language_detected': getattr(transcript, 'language_code', 'en'),
+            'audio_duration': getattr(transcript, 'audio_duration', 0) / 1000.0,
+            'confidence_score': getattr(transcript, 'confidence', 0.0),
+            'processing_time': time.time(),
+            'model_version': 'assemblyai-v2',
+            'features_used': [
+                'speaker_diarization',
+                'auto_chapters', 
+                'entity_detection',
+                'iab_categories'
+            ]
+        }
+    
+    async def save_to_supabase(self, episode_id: str, segments: List[Dict], 
+                             full_transcript: str, chapters: List[Dict], 
+                             entities: List[Dict], metadata: Dict):
+        """Save processed data to Supabase with AssemblyAI schema"""
         logger.info("Saving to Supabase...")
         
         try:
-            # Update episode with transcript
-            self.supabase.table('episodes').update({
+            # Get unique speakers
+            speakers = list(set(segment['speaker'] for segment in segments))
+            
+            # Update episode with AssemblyAI data
+            episode_update = {
                 'transcript': full_transcript,
-                'processing_status': 'processing'
-            }).eq('id', episode_id).execute()
+                'processing_status': 'processing',
+                'assemblyai_transcript_id': metadata['assemblyai_transcript_id'],
+                'assemblyai_status': 'completed',
+                'speakers': speakers,
+                'processing_metadata': metadata
+            }
+            
+            # Add chapters if available
+            if chapters:
+                episode_update['episode_chapters'] = chapters
+            
+            # Add entities if available
+            if entities:
+                episode_update['detected_entities'] = entities
+            
+            self.supabase.table('episodes').update(episode_update).eq('id', episode_id).execute()
             
             # Insert segments
             segment_data = []
@@ -150,13 +262,27 @@ class PodcastProcessor:
                     'speaker': segment['speaker'],
                     'timestamp_start': segment['timestamp_start'],
                     'timestamp_end': segment['timestamp_end'],
-                    'embedding': segment['embedding']
+                    'embedding': segment['embedding'],
+                    'confidence': segment.get('confidence', 0.9),
+                    'words': segment.get('words', []),
+                    'segment_type': segment.get('segment_type', 'utterance'),
+                    'language_code': segment.get('language_code', 'en')
                 })
             
             # Batch insert segments
+            if segment_data:
             self.supabase.table('segments').insert(segment_data).execute()
             
-            # Update status to completed
+            # Insert processing log entry
+            processing_log = {
+                'episode_id': episode_id,
+                'processing_type': 'assemblyai_transcription',
+                'status': 'completed',
+                'metadata': metadata
+            }
+            self.supabase.table('processing_logs').insert(processing_log).execute()
+            
+            # Update final status
             self.supabase.table('episodes').update({
                 'processing_status': 'completed'
             }).eq('id', episode_id).execute()
@@ -165,56 +291,104 @@ class PodcastProcessor:
             
         except Exception as e:
             logger.error(f"Error saving to Supabase: {e}")
-            # Update status to failed
+            # Log the error
+            try:
+                error_log = {
+                    'episode_id': episode_id,
+                    'processing_type': 'assemblyai_transcription',
+                    'status': 'failed',
+                    'error_message': str(e),
+                    'metadata': metadata
+                }
+                self.supabase.table('processing_logs').insert(error_log).execute()
+            except:
+                pass  # Don't fail on logging error
+            
+            # Update episode status to failed
             self.supabase.table('episodes').update({
-                'processing_status': 'failed'
+                'processing_status': 'failed',
+                'assemblyai_status': 'failed'
             }).eq('id', episode_id).execute()
             raise
     
     async def process(self, podcast_url: str, episode_id: str):
-        """Main processing pipeline"""
+        """Main processing pipeline using AssemblyAI"""
         try:
             # Update status to processing
             self.supabase.table('episodes').update({
-                'processing_status': 'processing'
+                'processing_status': 'processing',
+                'assemblyai_status': 'processing'
             }).eq('id', episode_id).execute()
             
-            # Download audio
+            # Step 1: Download audio
+            logger.info("Step 1: Downloading audio...")
             audio_path = await self.download_audio(podcast_url, f"/tmp/{episode_id}")
             
-            # Transcribe
-            transcription = await self.transcribe_audio(audio_path)
+            # Step 2: Transcribe and diarize with AssemblyAI
+            logger.info("Step 2: Transcribing with AssemblyAI...")
+            transcript = await self.transcribe_with_assemblyai(audio_path)
             
-            # Diarize speakers
-            diarized_result = await self.diarize_speakers(audio_path, transcription)
+            # Step 3: Extract segments with speakers
+            logger.info("Step 3: Extracting segments...")
+            segments = self.extract_segments_with_speakers(transcript)
             
-            # Generate embeddings
-            segments_with_embeddings = await self.generate_embeddings(diarized_result['segments'])
+            # Step 4: Extract chapters
+            logger.info("Step 4: Extracting chapters...")
+            chapters = self.extract_chapters(transcript)
             
-            # Create full transcript
-            full_transcript = " ".join([seg['text'] for seg in diarized_result['segments']])
+            # Step 5: Extract entities
+            logger.info("Step 5: Extracting entities...")
+            entities = self.extract_entities(transcript)
             
-            # Save to Supabase
-            await self.save_to_supabase(episode_id, segments_with_embeddings, full_transcript)
+            # Step 6: Generate embeddings
+            logger.info("Step 6: Generating embeddings...")
+            segments_with_embeddings = await self.generate_embeddings(segments)
+            
+            # Step 7: Create full transcript
+            full_transcript = " ".join([seg['text'] for seg in segments])
+            
+            # Step 8: Get processing metadata
+            metadata = self.get_processing_metadata(transcript)
+            
+            # Step 9: Save to Supabase
+            logger.info("Step 9: Saving to Supabase...")
+            await self.save_to_supabase(
+                episode_id, 
+                segments_with_embeddings, 
+                full_transcript, 
+                chapters, 
+                entities, 
+                metadata
+            )
+            
+            # Clean up temporary files
+            try:
+                os.remove(audio_path)
+            except:
+                pass
             
             logger.info(f"Successfully processed episode {episode_id}")
             
         except Exception as e:
             logger.error(f"Error processing podcast: {e}")
             # Update status to failed
+            try:
             self.supabase.table('episodes').update({
-                'processing_status': 'failed'
+                    'processing_status': 'failed',
+                    'assemblyai_status': 'failed'
             }).eq('id', episode_id).execute()
+            except:
+                pass  # Don't fail on status update error
             raise
 
 async def main():
-    parser = argparse.ArgumentParser(description='Process podcast episode')
+    parser = argparse.ArgumentParser(description='Process podcast episode with AssemblyAI')
     parser.add_argument('--url', required=True, help='Podcast episode URL')
     parser.add_argument('--episode-id', required=True, help='Episode ID')
     
     args = parser.parse_args()
     
-    processor = PodcastProcessor()
+    processor = AssemblyAIPodcastProcessor()
     await processor.process(args.url, args.episode_id)
 
 if __name__ == "__main__":

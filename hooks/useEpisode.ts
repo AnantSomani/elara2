@@ -1,3 +1,7 @@
+// AUTO-SWITCH: This file exports either the real or mock useEpisode hook
+// To use mocks, set EXPO_PUBLIC_USE_MOCKS=true in your .env.local
+// To use real backend, set EXPO_PUBLIC_USE_MOCKS=false
+
 import { useState, useEffect } from 'react';
 import { getEpisodeData, type EpisodeData } from '../lib/api';
 import { subscribeToEpisode } from '../lib/supabase';
@@ -9,10 +13,15 @@ export interface UseEpisodeResult {
   refetch: () => Promise<void>;
 }
 
-/**
- * Custom hook for managing episode data with real-time updates
- */
-export function useEpisode(episodeId: string | null): UseEpisodeResult {
+const USE_MOCKS = process.env.EXPO_PUBLIC_USE_MOCKS === 'true';
+
+let useEpisodeImpl: (episodeId: string | null) => UseEpisodeResult;
+
+if (USE_MOCKS) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  useEpisodeImpl = require('./useEpisode.mock').useEpisode;
+} else {
+  useEpisodeImpl = function useEpisode(episodeId: string | null): UseEpisodeResult {
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +59,6 @@ export function useEpisode(episodeId: string | null): UseEpisodeResult {
 
     const subscription = subscribeToEpisode(episodeId, (updatedEpisode) => {
       setEpisode(updatedEpisode);
-      
-      // If processing just completed, we might want to refetch full data
       if (updatedEpisode.processingStatus === 'completed') {
         fetchEpisode();
       }
@@ -67,5 +74,9 @@ export function useEpisode(episodeId: string | null): UseEpisodeResult {
     isLoading,
     error,
     refetch,
+    };
   };
 } 
+
+export const useEpisode = useEpisodeImpl;
+export type { UseEpisodeResult } from './useEpisode.mock'; // type is the same for both 

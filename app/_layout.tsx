@@ -11,20 +11,34 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
       <Stack>
         <Stack.Screen 
           name="index" 
           options={{ 
-            title: 'ElaraV2',
-            headerShown: true
+            title: 'Elara',
+            headerShown: false
+          }} 
+        />
+        <Stack.Screen 
+          name="youtube" 
+          options={{ 
+            title: 'Add YouTube Podcast',
+            headerShown: false
+          }} 
+        />
+        <Stack.Screen 
+          name="continue" 
+          options={{ 
+            title: 'Continue Podcasts',
+            headerShown: false
           }} 
         />
         <Stack.Screen 
           name="[episode]/index" 
           options={{ 
             title: 'Podcast Assistant',
-            headerShown: true
+            headerShown: false
           }} 
         />
       </Stack>
