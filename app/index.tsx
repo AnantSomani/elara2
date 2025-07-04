@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   View, 
   Text, 
@@ -11,13 +11,12 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { GlassButton } from '../components/GlassButton';
-import { VoiceWaveform } from '../components/VoiceWaveform';
-import { EnhancedLiquidGlass } from '../components/EnhancedLiquidGlass';
+import VoiceWaveform from '../components/VoiceWaveform';
 
 const { width, height } = Dimensions.get('window');
 
 export default function HomePage() {
-  const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const [isVoiceActive, setIsVoiceActive] = React.useState(false);
 
   const handleVoiceToggle = () => {
     setIsVoiceActive(!isVoiceActive);
@@ -62,16 +61,15 @@ export default function HomePage() {
 
         {/* Main Voice Interface */}
         <View style={styles.voiceContainer}>
-          <EnhancedLiquidGlass 
-            borderRadius={80} 
-            intensity="ultra"
-            tint="light"
-            glowEffect={isVoiceActive}
-            style={styles.voiceButtonContainer}
+          <View 
+            style={[
+              { borderRadius: 80, padding: 20 }, 
+              styles.voiceButton
+            ]}
           >
-            <TouchableOpacity 
-              style={styles.voiceButton}
+            <TouchableOpacity
               onPress={handleVoiceToggle}
+              style={styles.voiceButtonInner}
               activeOpacity={0.8}
             >
               <VoiceWaveform 
@@ -81,7 +79,7 @@ export default function HomePage() {
                 color="rgba(255, 255, 255, 0.9)"
               />
             </TouchableOpacity>
-          </EnhancedLiquidGlass>
+          </View>
           
           <Text style={styles.voiceHint}>
             {isVoiceActive ? 'Listening...' : 'Tap to speak'}
@@ -90,90 +88,65 @@ export default function HomePage() {
 
         {/* Action Buttons */}
         <View style={styles.actionContainer}>
-          <EnhancedLiquidGlass 
-            borderRadius={20} 
-            intensity="high"
-            tint="light"
-            style={styles.buttonContainer}
+          <View 
+            style={[
+              { borderRadius: 20, marginBottom: 16 }, 
+              styles.actionButton
+            ]}
           >
             <GlassButton
               title="Continue Podcasts"
               onPress={handleContinuePodcasts}
               variant="primary"
               size="lg"
-              style={styles.actionButton}
-              icon={
-                <View style={styles.buttonIcon}>
-                  <Text style={styles.iconText}>▶</Text>
-                </View>
-              }
             />
-          </EnhancedLiquidGlass>
+          </View>
 
-          <EnhancedLiquidGlass 
-            borderRadius={20} 
-            intensity="high"
-            tint="light"
-            style={styles.buttonContainer}
+          <View 
+            style={[
+              { borderRadius: 20, marginBottom: 16 }, 
+              styles.actionButton
+            ]}
           >
             <GlassButton
               title="Add from YouTube"
               onPress={handleYouTubeMode}
               variant="secondary"
               size="lg"
-              style={styles.actionButton}
-              icon={
-                <View style={styles.buttonIcon}>
-                  <Text style={styles.iconText}>📺</Text>
-                </View>
-              }
             />
-          </EnhancedLiquidGlass>
+          </View>
         </View>
 
         {/* Chat with Friends Panel */}
-        <EnhancedLiquidGlass 
-          borderRadius={24} 
-          intensity="ultra"
-          tint="light"
-          style={styles.chatPanelContainer}
+        <View 
+          style={[
+            { borderRadius: 24, padding: 20 }, 
+            styles.chatPanelContainer
+          ]}
         >
-          <TouchableOpacity 
-            style={styles.chatPanel}
-            onPress={handleChatWithFriends}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.chatTitle}>Chat with Friends</Text>
-            
-            <View style={styles.chatContent}>
-              <View style={styles.notificationWidget}>
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.badgeText}>3</Text>
-                </View>
-                <EnhancedLiquidGlass 
-                  borderRadius={25} 
-                  intensity="medium"
-                  tint="light"
-                  style={styles.notificationIconContainer}
+          <View style={styles.chatPanel}>
+            <View style={styles.chatHeader}>
+              <Text style={styles.chatTitle}>Chat with Friends</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>3</Text>
+              </View>
+              <View 
+                style={[
+                  { borderRadius: 25, padding: 8 }, 
+                  styles.notificationButton
+                ]}
               >
-                  <View style={styles.notificationIcon}>
-                    <Text style={styles.notificationEmoji}>💬</Text>
+                <TouchableOpacity 
+                  onPress={handleChatWithFriends}
+                  style={styles.notificationButton}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.notificationEmoji}>💬</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-                </EnhancedLiquidGlass>
           </View>
-
-              <View style={styles.chatInfo}>
-                <Text style={styles.chatDescription}>
-                  Share podcast moments and discuss with your community
-                </Text>
-                <View style={styles.onlineIndicator}>
-                  <View style={styles.onlineDot} />
-                  <Text style={styles.onlineText}>5 friends online</Text>
         </View>
-      </View>
-    </View>
-          </TouchableOpacity>
-        </EnhancedLiquidGlass>
       </ScrollView>
     </SafeAreaView>
   );
@@ -214,10 +187,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 50,
   },
-  voiceButtonContainer: {
-    padding: 0,
-  },
   voiceButton: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceButtonInner: {
     width: 160,
     height: 160,
     borderRadius: 80,
@@ -234,31 +211,23 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     gap: 16,
   },
-  buttonContainer: {
-    marginBottom: 12,
-  },
   actionButton: {
     backgroundColor: 'transparent',
     borderWidth: 0,
     shadowOpacity: 0,
     elevation: 0,
   },
-  buttonIcon: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconText: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
   chatPanelContainer: {
-    // EnhancedLiquidGlass will handle styling
+    // TestGlass will handle styling
   },
   chatPanel: {
     padding: 24,
     minHeight: 120,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   chatTitle: {
     fontSize: 20,
@@ -270,77 +239,19 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  chatContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  notificationWidget: {
+  badge: {
     position: 'relative',
     marginRight: 16,
   },
-  notificationIconContainer: {
+  notificationButton: {
     padding: 0,
-  },
-  notificationIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   notificationEmoji: {
     fontSize: 24,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#EC4899',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-    shadowColor: '#EC4899',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 6,
   },
   badgeText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
-  },
-  chatInfo: {
-    flex: 1,
-  },
-  chatDescription: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  onlineIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginRight: 6,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.8,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  onlineText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
   },
 }); 

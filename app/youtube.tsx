@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { GlassButton } from '../components/GlassButton';
-import { EnhancedLiquidGlass } from '../components/EnhancedLiquidGlass';
+import SimpleView from '../components/TestGlass';
 import { processPodcastLink, type ProcessResult } from '../lib/api';
 
 // Mock podcast data for search
@@ -109,7 +109,7 @@ export default function YouTubePage() {
           </View>
 
           {/* Input Panel */}
-          <EnhancedLiquidGlass
+          <SimpleView
             intensity="high"
             borderRadius={20}
             style={styles.inputPanel}
@@ -130,11 +130,11 @@ export default function YouTubePage() {
                 keyboardType="url"
               />
             </View>
-          </EnhancedLiquidGlass>
+          </SimpleView>
 
           {/* Action Buttons */}
           <View style={styles.actionContainer}>
-            <EnhancedLiquidGlass
+            <SimpleView
               intensity="ultra"
               borderRadius={16}
               glowEffect={!isLoading}
@@ -142,16 +142,15 @@ export default function YouTubePage() {
             >
               <GlassButton
                 title={isLoading ? 'Processing...' : 'Start Conversation'}
-                onPress={handleSubmit}
+                onPress={isLoading ? () => {} : handleSubmit}
                 variant="primary"
                 size="lg"
-                disabled={isLoading}
                 style={styles.actionButton}
               />
-            </EnhancedLiquidGlass>
+            </SimpleView>
 
             {/* Demo Mode Button for UI Testing */}
-            <EnhancedLiquidGlass
+            <SimpleView
               intensity="medium"
               borderRadius={16}
               style={styles.demoButtonWrapper}
@@ -163,7 +162,7 @@ export default function YouTubePage() {
                 size="md"
                 style={styles.demoButton}
               />
-            </EnhancedLiquidGlass>
+            </SimpleView>
             
             <Text style={styles.demoText}>
               Use Demo Mode to skip URL processing and go directly to the podcast player with mock data for UI testing
@@ -171,7 +170,7 @@ export default function YouTubePage() {
           </View>
 
           {/* Podcast Search Widget */}
-          <EnhancedLiquidGlass
+          <SimpleView
             intensity="medium"
             borderRadius={20}
             style={styles.searchPanel}
@@ -198,7 +197,7 @@ export default function YouTubePage() {
                   onPress={() => handlePodcastSelect(podcast)}
                   activeOpacity={0.7}
                 >
-                  <EnhancedLiquidGlass
+                  <SimpleView
                     intensity="low"
                     borderRadius={12}
                     style={styles.podcastCard}
@@ -211,11 +210,11 @@ export default function YouTubePage() {
                     <View style={styles.linkIcon}>
                       <Text style={styles.linkIconText}>🔗</Text>
                     </View>
-                  </EnhancedLiquidGlass>
+                  </SimpleView>
                 </TouchableOpacity>
               ))}
             </View>
-          </EnhancedLiquidGlass>
+          </SimpleView>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -299,7 +298,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   buttonWrapper: {
-    // EnhancedLiquidGlass will handle styling
+    // TestGlass will handle styling
   },
   actionButton: {
     backgroundColor: 'transparent',

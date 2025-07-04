@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { GlassButton } from '../components/GlassButton';
-import { EnhancedLiquidGlass } from '../components/EnhancedLiquidGlass';
+import SimpleView from '../components/TestGlass';
 
 const { width } = Dimensions.get('window');
 
@@ -140,7 +140,7 @@ export default function ContinuePage() {
         </View>
 
         {/* Filter Tabs */}
-        <EnhancedLiquidGlass
+        <SimpleView
           intensity="medium"
           borderRadius={16}
           style={styles.filterContainer}
@@ -155,7 +155,7 @@ export default function ContinuePage() {
                 ]}
                 onPress={() => setSelectedFilter(filter as any)}
               >
-                <EnhancedLiquidGlass
+                <SimpleView
                   intensity={selectedFilter === filter ? "high" : "low"}
                   borderRadius={12}
                   selected={selectedFilter === filter}
@@ -167,16 +167,16 @@ export default function ContinuePage() {
                   ]}>
                     {filter.charAt(0).toUpperCase() + filter.slice(1)}
                   </Text>
-                </EnhancedLiquidGlass>
+                </SimpleView>
               </TouchableOpacity>
             ))}
           </View>
-        </EnhancedLiquidGlass>
+        </SimpleView>
 
         {/* Episodes List */}
         <View style={styles.episodesList}>
           {getFilteredEpisodes().map((episode) => (
-            <EnhancedLiquidGlass
+            <SimpleView
               key={episode.id}
               intensity="high"
               borderRadius={20}
@@ -234,7 +234,7 @@ export default function ContinuePage() {
                   
                   <View style={styles.actionButtons}>
                     {episode.conversationCount > 0 && (
-                      <EnhancedLiquidGlass
+                      <SimpleView
                         intensity="medium"
                         borderRadius={12}
                         style={styles.secondaryButtonContainer}
@@ -246,10 +246,10 @@ export default function ContinuePage() {
                           size="sm"
                           style={styles.secondaryButton}
                         />
-                      </EnhancedLiquidGlass>
+                      </SimpleView>
                     )}
                     
-                    <EnhancedLiquidGlass
+                    <SimpleView
                       intensity="ultra"
                       borderRadius={12}
                       glowEffect={true}
@@ -269,16 +269,16 @@ export default function ContinuePage() {
                           </View>
                         }
                       />
-                    </EnhancedLiquidGlass>
+                    </SimpleView>
                   </View>
                 </View>
               </View>
-            </EnhancedLiquidGlass>
+            </SimpleView>
           ))}
         </View>
 
         {getFilteredEpisodes().length === 0 && (
-          <EnhancedLiquidGlass
+          <SimpleView
             intensity="medium"
             borderRadius={20}
             style={styles.emptyStateContainer}
@@ -292,7 +292,7 @@ export default function ContinuePage() {
                   : `No ${selectedFilter} episodes yet`
                 }
               </Text>
-              <EnhancedLiquidGlass
+              <SimpleView
                 intensity="high"
                 borderRadius={12}
                 style={styles.emptyStateButtonContainer}
@@ -309,9 +309,9 @@ export default function ContinuePage() {
                     </View>
                   }
                 />
-              </EnhancedLiquidGlass>
+              </SimpleView>
             </View>
-          </EnhancedLiquidGlass>
+          </SimpleView>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   activeFilterTab: {
-    // Additional styling handled by EnhancedLiquidGlass selected prop
+    // Additional styling handled by SimpleView selected prop
   },
   filterTabText: {
     fontSize: 14,
@@ -493,10 +493,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   secondaryButtonContainer: {
-    // EnhancedLiquidGlass will handle styling
+    // SimpleView will handle styling
   },
   primaryButtonContainer: {
-    // EnhancedLiquidGlass will handle styling
+    // SimpleView will handle styling
   },
   secondaryButton: {
     backgroundColor: 'transparent',
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptyStateButtonContainer: {
-    // EnhancedLiquidGlass will handle styling
+    // SimpleView will handle styling
   },
   emptyStateButton: {
     backgroundColor: 'transparent',

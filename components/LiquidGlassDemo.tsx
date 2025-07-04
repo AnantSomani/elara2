@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { EnhancedLiquidGlass } from './EnhancedLiquidGlass';
+import SimpleView from './TestGlass';
 
 export function LiquidGlassDemo() {
   const [selectedIntensity, setSelectedIntensity] = useState<'low' | 'medium' | 'high' | 'ultra'>('medium');
@@ -49,7 +49,7 @@ export function LiquidGlassDemo() {
       {/* Demo Cards */}
       <View style={styles.demoGrid}>
         {/* Basic Card */}
-        <EnhancedLiquidGlass
+        <SimpleView
           intensity={selectedIntensity}
           selected={selected}
           glowEffect={glowEffect}
@@ -60,10 +60,10 @@ export function LiquidGlassDemo() {
           <Text style={styles.cardText}>
             Clean greyish translucent effect with {selectedIntensity} intensity
           </Text>
-        </EnhancedLiquidGlass>
+        </SimpleView>
 
         {/* Button Style */}
-        <EnhancedLiquidGlass
+        <SimpleView
           intensity={selectedIntensity}
           selected={selected}
           glowEffect={glowEffect}
@@ -71,10 +71,10 @@ export function LiquidGlassDemo() {
           style={styles.demoButton}
         >
           <Text style={styles.buttonText}>Profile</Text>
-        </EnhancedLiquidGlass>
+        </SimpleView>
 
         {/* Circular Element */}
-        <EnhancedLiquidGlass
+        <SimpleView
           intensity={selectedIntensity}
           selected={selected}
           glowEffect={glowEffect}
@@ -82,10 +82,10 @@ export function LiquidGlassDemo() {
           style={styles.circularDemo}
         >
           <Text style={styles.emojiText}>⚙️</Text>
-        </EnhancedLiquidGlass>
+        </SimpleView>
 
         {/* Panel */}
-        <EnhancedLiquidGlass
+        <SimpleView
           intensity={selectedIntensity}
           selected={selected}
           glowEffect={glowEffect}
@@ -106,7 +106,7 @@ export function LiquidGlassDemo() {
               <Text style={styles.statLabel}>Categories</Text>
             </View>
           </View>
-        </EnhancedLiquidGlass>
+        </SimpleView>
       </View>
     </ScrollView>
   );

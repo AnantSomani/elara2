@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { BlurView } from 'expo-blur';
+import VoiceWaveform from '../../components/VoiceWaveform';
+import SimpleView from '../../components/TestGlass';
 
 // Mock data for the episode
 const MOCK_EPISODE = {
@@ -66,76 +68,6 @@ const MOCK_CHAT_MESSAGES = [
     hostVoice: 'Lex Fridman',
   },
 ];
-
-// Enhanced Liquid Glass Component
-interface EnhancedLiquidGlassProps {
-  children: React.ReactNode;
-  intensity?: 'low' | 'medium' | 'high' | 'ultra';
-  borderRadius?: number;
-  style?: any;
-  selected?: boolean;
-  glowEffect?: boolean;
-}
-
-const EnhancedLiquidGlass: React.FC<EnhancedLiquidGlassProps> = ({ 
-  children, 
-  intensity = 'medium', 
-  borderRadius = 16, 
-  style,
-  selected = false,
-  glowEffect = false
-}) => {
-  const getBlurAmount = () => {
-    switch (intensity) {
-      case 'low': return 15;
-      case 'medium': return 25;
-      case 'high': return 35;
-      case 'ultra': return 50;
-      default: return 25;
-    }
-  };
-
-  const getOpacity = () => {
-    if (selected) {
-      switch (intensity) {
-        case 'low': return 0.12;
-        case 'medium': return 0.16;
-        case 'high': return 0.20;
-        case 'ultra': return 0.24;
-        default: return 0.16;
-      }
-    }
-    switch (intensity) {
-      case 'low': return 0.08;
-      case 'medium': return 0.12;
-      case 'high': return 0.15;
-      case 'ultra': return 0.18;
-      default: return 0.12;
-    }
-  };
-
-  return (
-    <View style={[
-      {
-        borderRadius,
-        overflow: 'hidden',
-        backgroundColor: `rgba(255, 255, 255, ${getOpacity()})`,
-        borderWidth: 1,
-        borderColor: selected ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)',
-        shadowColor: '#ffffff',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: glowEffect ? 0.3 : 0.1,
-        shadowRadius: glowEffect ? 20 : 12,
-        elevation: 8,
-      },
-      style
-    ]}>
-      <BlurView intensity={getBlurAmount()} style={{ flex: 1 }}>
-        {children}
-      </BlurView>
-    </View>
-  );
-};
 
 // Glass Button Component
 interface GlassButtonProps {
@@ -204,8 +136,12 @@ export default function EpisodePage() {
   const { episode: episodeParam, view } = useLocalSearchParams<{ episode: string; view?: string }>();
   const [activeTab, setActiveTab] = useState<'overview' | 'conversation'>(view === 'conversation' ? 'conversation' : 'overview');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioPosition, setAudioPosition] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [messages, setMessages] = useState(MOCK_CHAT_MESSAGES);
+  const [currentSpeaker, setCurrentSpeaker] = useState('Chamath');
 
   const handleBackPress = () => {
     router.back();
@@ -216,7 +152,29 @@ export default function EpisodePage() {
   };
 
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    // Simulate audio loading
+    setTimeout(() => {
+      setIsPlaying(!isPlaying);
+      setIsLoading(false);
+      
+      // Simulate audio progress updates
+      if (!isPlaying) {
+        const interval = setInterval(() => {
+          setAudioPosition(prev => {
+            const newPosition = prev + 1;
+            if (newPosition >= audioDuration) {
+              clearInterval(interval);
+              setIsPlaying(false);
+              return 0;
+            }
+            return newPosition;
+          });
+        }, 1000);
+      }
+    }, 500);
   };
 
   const handleSendMessage = () => {
@@ -255,6 +213,29 @@ export default function EpisodePage() {
     return MOCK_EPISODE.progress;
   };
 
+  // Function to get the current speaker based on the latest conversation
+  const getCurrentSpeaker = () => {
+    const lastResponse = messages.slice().reverse().find(msg => msg.type === 'response' && msg.hostVoice);
+    if (lastResponse && 'hostVoice' in lastResponse) {
+      return lastResponse.hostVoice || MOCK_EPISODE.hosts[0];
+    }
+    return MOCK_EPISODE.hosts[0]; // Default to first host
+  };
+
+  // Update current speaker when messages change
+  React.useEffect(() => {
+    setCurrentSpeaker(getCurrentSpeaker());
+  }, [messages]);
+
+  // Initialize audio duration from mock episode
+  React.useEffect(() => {
+    const durationInSeconds = 3 * 60 + 24; // 3:24:15 converted to seconds
+    setAudioDuration(durationInSeconds);
+  }, []);
+
+  // Determine if waveform should be active based on audio state
+  const isWaveformActive = isPlaying && !isLoading && audioPosition > 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -272,11 +253,11 @@ export default function EpisodePage() {
         >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleBackPress}>
-            <EnhancedLiquidGlass intensity="medium" borderRadius={12} style={styles.backButton}>
-              <Text style={styles.backButtonText}>←</Text>
-            </EnhancedLiquidGlass>
-          </TouchableOpacity>
+                     <TouchableOpacity onPress={handleBackPress}>
+             <SimpleView intensity="medium" borderRadius={12} style={styles.backButton}>
+               <Text style={styles.backButtonText}>‹</Text>
+             </SimpleView>
+           </TouchableOpacity>
           
           <TouchableOpacity onPress={handleHomePress}>
             <Text style={styles.elaraTitle}>Elara</Text>
@@ -285,8 +266,23 @@ export default function EpisodePage() {
           <View style={{ width: 44 }} />
         </View>
 
+        {/* Voice Waveform Component */}
+        <View style={styles.waveformSection}>
+          <VoiceWaveform 
+            hostName={currentSpeaker}
+            isActive={isWaveformActive}
+            isPaused={isPlaying && !isWaveformActive}
+            intensity="ultra"
+            size={160}
+            audioLevel={isWaveformActive ? 0.7 : 0.3}
+          />
+          {isLoading && (
+            <Text style={styles.loadingText}>Loading audio...</Text>
+          )}
+        </View>
+
         {/* Episode Info Card */}
-        <EnhancedLiquidGlass intensity="high" borderRadius={20} style={styles.episodeCard}>
+        <SimpleView intensity="high" borderRadius={20} style={styles.episodeCard}>
           <View style={styles.episodeHeader}>
             <Text style={styles.episodeThumbnail}>{MOCK_EPISODE.thumbnail}</Text>
             <View style={styles.episodeInfo}>
@@ -316,43 +312,43 @@ export default function EpisodePage() {
 
           {/* Player Controls */}
           <View style={styles.playerControls}>
-            <EnhancedLiquidGlass intensity="medium" borderRadius={12} style={styles.controlButton}>
+            <SimpleView intensity="medium" borderRadius={12} style={styles.controlButton}>
               <GlassButton
                 title="⏮"
                 onPress={() => console.log('Previous')}
                 variant="secondary"
                 size="sm"
               />
-            </EnhancedLiquidGlass>
+            </SimpleView>
             
-            <EnhancedLiquidGlass intensity="ultra" borderRadius={16} glowEffect style={styles.playButton}>
+            <SimpleView intensity="ultra" borderRadius={16} glowEffect style={styles.playButton}>
               <GlassButton
                 title={isPlaying ? '⏸' : '▶️'}
                 onPress={handlePlayPause}
                 variant="primary"
                 size="lg"
               />
-            </EnhancedLiquidGlass>
+            </SimpleView>
             
-            <EnhancedLiquidGlass intensity="medium" borderRadius={12} style={styles.controlButton}>
+            <SimpleView intensity="medium" borderRadius={12} style={styles.controlButton}>
               <GlassButton
                 title="⏭"
                 onPress={() => console.log('Next')}
                 variant="secondary"
                 size="sm"
               />
-            </EnhancedLiquidGlass>
+            </SimpleView>
           </View>
-        </EnhancedLiquidGlass>
+        </SimpleView>
 
         {/* Tab Navigation */}
-        <EnhancedLiquidGlass intensity="medium" borderRadius={16} style={styles.tabContainer}>
+        <SimpleView intensity="medium" borderRadius={16} style={styles.tabContainer}>
           <View style={styles.tabButtons}>
             <TouchableOpacity
               style={styles.tab}
               onPress={() => setActiveTab('overview')}
             >
-              <EnhancedLiquidGlass
+              <SimpleView
                 intensity={activeTab === 'overview' ? 'high' : 'low'}
                 borderRadius={12}
                 selected={activeTab === 'overview'}
@@ -364,14 +360,14 @@ export default function EpisodePage() {
                 ]}>
                   Overview
                 </Text>
-              </EnhancedLiquidGlass>
+              </SimpleView>
             </TouchableOpacity>
             
             <TouchableOpacity
               style={styles.tab}
               onPress={() => setActiveTab('conversation')}
             >
-              <EnhancedLiquidGlass
+              <SimpleView
                 intensity={activeTab === 'conversation' ? 'high' : 'low'}
                 borderRadius={12}
                 selected={activeTab === 'conversation'}
@@ -383,14 +379,14 @@ export default function EpisodePage() {
                  ]}>
                    💬 Conversation ({Math.ceil(messages.filter(m => m.type === 'question').length)})
                  </Text>
-              </EnhancedLiquidGlass>
+              </SimpleView>
             </TouchableOpacity>
           </View>
-        </EnhancedLiquidGlass>
+        </SimpleView>
 
         {/* Tab Content */}
         {activeTab === 'overview' ? (
-          <EnhancedLiquidGlass intensity="high" borderRadius={20} style={styles.contentCard}>
+          <SimpleView intensity="high" borderRadius={20} style={styles.contentCard}>
             <View style={styles.overviewContent}>
               <Text style={styles.sectionTitle}>About This Episode</Text>
               <Text style={styles.description}>{MOCK_EPISODE.description}</Text>
@@ -412,15 +408,15 @@ export default function EpisodePage() {
               <Text style={styles.sectionTitle}>Tags</Text>
               <View style={styles.tagsContainer}>
                 {MOCK_EPISODE.tags.map((tag, index) => (
-                  <EnhancedLiquidGlass key={index} intensity="low" borderRadius={8} style={styles.tag}>
+                  <SimpleView key={index} intensity="low" borderRadius={8} style={styles.tag}>
                     <Text style={styles.tagText}>{tag}</Text>
-                  </EnhancedLiquidGlass>
+                  </SimpleView>
                 ))}
               </View>
             </View>
-          </EnhancedLiquidGlass>
+          </SimpleView>
         ) : (
-          <EnhancedLiquidGlass intensity="high" borderRadius={20} style={styles.contentCard}>
+          <SimpleView intensity="high" borderRadius={20} style={styles.contentCard}>
             <View style={styles.conversationContent}>
               <Text style={styles.sectionTitle}>Your Conversation</Text>
               
@@ -428,7 +424,7 @@ export default function EpisodePage() {
                <View style={styles.messagesContainer}>
                  {messages.map((message) => (
                   <View key={message.id} style={styles.messageWrapper}>
-                    <EnhancedLiquidGlass
+                    <SimpleView
                       intensity={message.type === 'question' ? 'medium' : 'low'}
                       borderRadius={16}
                       style={[
@@ -450,13 +446,13 @@ export default function EpisodePage() {
                           </>
                         )}
                       </View>
-                    </EnhancedLiquidGlass>
+                    </SimpleView>
                   </View>
                 ))}
               </View>
 
                              {/* Chat Input */}
-               <EnhancedLiquidGlass intensity="medium" borderRadius={16} style={styles.chatInputContainer}>
+               <SimpleView intensity="medium" borderRadius={16} style={styles.chatInputContainer}>
                  <View style={styles.chatInput}>
                    <TextInput
                      style={styles.textInput}
@@ -470,7 +466,7 @@ export default function EpisodePage() {
                      onSubmitEditing={handleSendMessage}
                      blurOnSubmit={false}
                    />
-                   <EnhancedLiquidGlass intensity="high" borderRadius={12} glowEffect style={styles.sendButton}>
+                   <SimpleView intensity="high" borderRadius={12} glowEffect style={styles.sendButton}>
                      <GlassButton
                        title="Send"
                        onPress={handleSendMessage}
@@ -478,11 +474,11 @@ export default function EpisodePage() {
                        size="sm"
                        icon={<Text style={styles.sendIcon}>💭</Text>}
                      />
-                   </EnhancedLiquidGlass>
+                   </SimpleView>
                  </View>
-               </EnhancedLiquidGlass>
+               </SimpleView>
             </View>
-          </EnhancedLiquidGlass>
+          </SimpleView>
                  )}
        </ScrollView>
       </KeyboardAvoidingView>
@@ -511,17 +507,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 20,
   },
-  backButton: {
-    width: 44,
-    height: 44,
+  waveformSection: {
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 24,
   },
-  backButtonText: {
-    fontSize: 20,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '600',
+  loadingText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
+     backButton: {
+     width: 44,
+     height: 44,
+     alignItems: 'center',
+     justifyContent: 'center',
+   },
+   backButtonText: {
+     fontSize: 24,
+     color: 'rgba(255, 255, 255, 0.9)',
+     fontWeight: '400',
+     textAlign: 'center',
+     lineHeight: 24,
+   },
   elaraTitle: {
     fontSize: 28,
     fontWeight: '300',
@@ -646,6 +654,77 @@ const styles = StyleSheet.create({
   contentCard: {
     padding: 20,
   },
+  conversationContent: {
+    gap: 16,
+  },
+  messagesContainer: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  messageWrapper: {
+    // Container for each message
+  },
+  messageContainer: {
+    padding: 16,
+  },
+  questionMessage: {
+    // Additional styling for questions
+  },
+  responseMessage: {
+    // Additional styling for responses
+  },
+  messageContent: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  messageTime: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  hostVoice: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginLeft: 8,
+  },
+  playAudioButton: {
+    marginLeft: 8,
+  },
+  playAudioText: {
+    fontSize: 16,
+  },
+  chatInputContainer: {
+    padding: 16,
+  },
+  chatInput: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+  },
+  textInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    minHeight: 44,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  sendButton: {
+    padding: 8,
+  },
+  sendIcon: {
+    fontSize: 16,
+  },
   overviewContent: {
     gap: 16,
   },
@@ -688,75 +767,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
-  },
-  conversationContent: {
-    gap: 16,
-  },
-  messagesContainer: {
-    gap: 16,
-  },
-  messageWrapper: {
-    marginBottom: 8,
-  },
-  messageContainer: {
-    padding: 16,
-  },
-  questionMessage: {
-    alignSelf: 'flex-end',
-    maxWidth: '85%',
-  },
-  responseMessage: {
-    alignSelf: 'flex-start',
-    maxWidth: '90%',
-  },
-  messageContent: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  messageTime: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  hostVoice: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '500',
-  },
-  playAudioButton: {
-    marginLeft: 'auto',
-  },
-  playAudioText: {
-    fontSize: 16,
-  },
-  chatInputContainer: {
-    marginTop: 16,
-    padding: 12,
-  },
-  chatInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-     textInput: {
-     flex: 1,
-     fontSize: 16,
-     color: 'rgba(255, 255, 255, 0.9)',
-     paddingVertical: 12,
-     paddingHorizontal: 8,
-     maxHeight: 100,
-     minHeight: 44,
-   },
-  sendButton: {
-    paddingHorizontal: 4,
-  },
-  sendIcon: {
-    fontSize: 16,
   },
 }); 
