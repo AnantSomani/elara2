@@ -132,8 +132,8 @@ export default function ContinuePage() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleHomePress} style={styles.elaraHeader}>
-            <Text style={styles.elaraTitle}>Elara</Text>
+          <TouchableOpacity onPress={() => router.replace('/') }>
+            <Text style={styles.elaraLogoGlow}>elara</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Continue Podcasts</Text>
           <Text style={styles.subtitle}>Pick up where you left off or explore your conversations</Text>
@@ -333,20 +333,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
-  elaraHeader: {
-    alignSelf: 'center',
-    marginBottom: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  elaraTitle: {
-    fontSize: 32,
-    fontWeight: '300',
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontFamily: 'Brush Script MT',
-    textShadowColor: 'rgba(255, 255, 255, 0.2)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+  elaraLogoGlow: {
+    fontSize: 48,
+    fontFamily: 'Snell Roundhand',
+    color: '#aeefff',
+    textAlign: 'center',
+    fontWeight: '400',
+    textShadowColor: '#aeefff',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 7,
+    shadowColor: '#aeefff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
   },
   title: {
     fontSize: 28,

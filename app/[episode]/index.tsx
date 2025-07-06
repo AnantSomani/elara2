@@ -253,17 +253,9 @@ export default function EpisodePage() {
         >
         {/* Header */}
         <View style={styles.header}>
-                     <TouchableOpacity onPress={handleBackPress}>
-             <SimpleView intensity="medium" borderRadius={12} style={styles.backButton}>
-               <Text style={styles.backButtonText}>‹</Text>
-             </SimpleView>
-           </TouchableOpacity>
-          
-          <TouchableOpacity onPress={handleHomePress}>
-            <Text style={styles.elaraTitle}>Elara</Text>
+          <TouchableOpacity onPress={() => router.replace('/') }>
+            <Text style={styles.elaraLogoGlow}>elara</Text>
           </TouchableOpacity>
-          
-          <View style={{ width: 44 }} />
         </View>
 
         {/* Voice Waveform Component */}
@@ -530,14 +522,19 @@ const styles = StyleSheet.create({
      textAlign: 'center',
      lineHeight: 24,
    },
-  elaraTitle: {
-    fontSize: 28,
-    fontWeight: '300',
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontFamily: 'Brush Script MT',
-    textShadowColor: 'rgba(255, 255, 255, 0.2)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+  elaraLogoGlow: {
+    fontSize: 48,
+    fontFamily: 'Snell Roundhand',
+    color: '#aeefff',
+    textAlign: 'center',
+    fontWeight: '400',
+    textShadowColor: '#aeefff',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 7,
+    shadowColor: '#aeefff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
   },
   episodeCard: {
     marginBottom: 20,

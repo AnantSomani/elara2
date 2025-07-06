@@ -48,7 +48,7 @@ export function GlassButton({
         return {
           paddingHorizontal: 32,
           paddingVertical: 16,
-          fontSize: 18,
+          fontSize: 20,
         };
       default:
         return {
@@ -74,7 +74,7 @@ export function GlassButton({
   const textStyles = [
     styles.baseText,
     {
-      fontSize: sizeStyles.fontSize,
+      fontSize: (textStyle && textStyle.fontSize) ? textStyle.fontSize : sizeStyles.fontSize,
       color: disabled ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.95)',
     },
     textStyle,
@@ -99,6 +99,8 @@ const styles = StyleSheet.create({
   baseButton: {
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    minHeight: 60,
   },
   content: {
     flexDirection: 'row',

@@ -8,10 +8,12 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import { router } from 'expo-router';
 import { GlassButton } from '../components/GlassButton';
 import VoiceWaveform from '../components/VoiceWaveform';
+import { LiquidGlassContainer } from '../components/LiquidGlassContainer';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,10 +56,9 @@ export default function HomePage() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleHomePress}>
-            <Text style={styles.logoText}>Elara</Text>
+            <Text style={styles.elaraLogoGlow}>elara</Text>
           </TouchableOpacity>
-          <Text style={styles.subtitle}>Your AI Podcast Companion</Text>
-            </View>
+        </View>
 
         {/* Main Voice Interface */}
         <View style={styles.voiceContainer}>
@@ -74,79 +75,56 @@ export default function HomePage() {
             >
               <VoiceWaveform 
                 isActive={isVoiceActive} 
-                height={60} 
-                width={120}
-                color="rgba(255, 255, 255, 0.9)"
+                size={120}
               />
             </TouchableOpacity>
           </View>
-          
-          <Text style={styles.voiceHint}>
-            {isVoiceActive ? 'Listening...' : 'Tap to speak'}
-          </Text>
         </View>
 
         {/* Action Buttons */}
-        <View style={styles.actionContainer}>
-          <View 
-            style={[
-              { borderRadius: 20, marginBottom: 16 }, 
-              styles.actionButton
+        <LiquidGlassContainer borderRadius={28} intensity="high" style={{ marginBottom: 40, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
+          <Pressable
+            style={({ pressed }) => [
+              {
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 12,
+                minHeight: 80,
+                width: '100%',
+                backgroundColor: pressed ? 'rgba(30,30,30,0.5)' : 'transparent',
+                borderRadius: 28,
+              },
             ]}
+            onPress={handleContinuePodcasts}
           >
-            <GlassButton
-              title="Continue Podcasts"
-              onPress={handleContinuePodcasts}
-              variant="primary"
-              size="lg"
-            />
-          </View>
-
-          <View 
-            style={[
-              { borderRadius: 20, marginBottom: 16 }, 
-              styles.actionButton
+            <Text style={[styles.chatTitle, { textAlign: 'center', marginBottom: 0, fontSize: 26 }]}>Continue Podcasts</Text>
+          </Pressable>
+        </LiquidGlassContainer>
+        <LiquidGlassContainer borderRadius={28} intensity="high" style={{ marginBottom: 24, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
+          <Pressable
+            style={({ pressed }) => [
+              {
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 12,
+                minHeight: 80,
+                width: '100%',
+                backgroundColor: pressed ? 'rgba(30,30,30,0.5)' : 'transparent',
+                borderRadius: 28,
+              },
             ]}
+            onPress={handleYouTubeMode}
           >
-            <GlassButton
-              title="Add from YouTube"
-              onPress={handleYouTubeMode}
-              variant="secondary"
-              size="lg"
-            />
-          </View>
-        </View>
+            <Text style={[styles.chatTitle, { textAlign: 'center', marginBottom: 0, fontSize: 26 }]}>Add from YouTube</Text>
+          </Pressable>
+        </LiquidGlassContainer>
 
         {/* Chat with Friends Panel */}
-        <View 
-          style={[
-            { borderRadius: 24, padding: 20 }, 
-            styles.chatPanelContainer
-          ]}
-        >
-          <View style={styles.chatPanel}>
-            <View style={styles.chatHeader}>
-              <Text style={styles.chatTitle}>Chat with Friends</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
-              <View 
-                style={[
-                  { borderRadius: 25, padding: 8 }, 
-                  styles.notificationButton
-                ]}
-              >
-                <TouchableOpacity 
-                  onPress={handleChatWithFriends}
-                  style={styles.notificationButton}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.notificationEmoji}>💬</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+        <LiquidGlassContainer borderRadius={28} intensity="high" style={{ padding: 12, marginTop: 16, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={[styles.chatPanel, { alignItems: 'center', justifyContent: 'center', padding: 0, minHeight: 80 }]}> 
+            <Text style={[styles.chatTitle, { textAlign: 'center', marginBottom: 0, fontSize: 26 }]}>Chat with Friends</Text>
           </View>
-        </View>
+        </LiquidGlassContainer>
       </ScrollView>
     </SafeAreaView>
   );
@@ -160,28 +138,26 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 8,
     paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 20,
   },
-  logoText: {
+  elaraLogoGlow: {
     fontSize: 48,
-    fontWeight: '300',
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontFamily: 'Brush Script MT',
-    marginBottom: 8,
-    textShadowColor: 'rgba(255, 255, 255, 0.2)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '300',
-    letterSpacing: 1,
+    fontFamily: 'Snell Roundhand',
+    color: '#aeefff',
+    textAlign: 'center',
+    fontWeight: '400',
+    textShadowColor: '#aeefff',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 7,
+    shadowColor: '#aeefff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
   },
   voiceContainer: {
     alignItems: 'center',
@@ -200,12 +176,6 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  voiceHint: {
-    marginTop: 20,
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontWeight: '300',
   },
   actionContainer: {
     marginBottom: 40,
