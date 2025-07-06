@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Linking,
+  Clipboard,
 } from 'react-native';
 import { router } from 'expo-router';
 import { GlassButton } from '../components/GlassButton';
@@ -28,11 +29,27 @@ const POPULAR_PODCASTS = [
   { name: 'All-In Podcast', channel: 'All-In Podcast', description: 'Tech and business insights' },
 ];
 
+// Mock favorite channels
+const FAVORITE_CHANNELS = [
+  { name: 'Lex Fridman Podcast', channel: 'lexfridman', description: 'AI, science, and philosophy' },
+  { name: 'The Joe Rogan Experience', channel: 'PowerfulJRE', description: 'Long form conversations' },
+  { name: 'All-In Podcast', channel: 'All-In Podcast', description: 'Tech and business insights' },
+];
+
+// Mock new episodes from favorites
+const NEW_EPISODES = [
+  { title: 'AI Safety with Yoshua Bengio', channel: 'lexfridman', description: 'Latest on AI alignment', duration: '2:15:30' },
+  { title: 'Markets, Politics & AI Revolution', channel: 'All-In Podcast', description: 'The besties discuss market trends', duration: '1:32:18' },
+  { title: 'Elon Musk Returns', channel: 'PowerfulJRE', description: 'Tesla, SpaceX, and Twitter', duration: '3:02:15' },
+  { title: 'The Future of Robotics', channel: 'lexfridman', description: 'Boston Dynamics CEO', duration: '1:58:45' },
+];
+
 export default function YouTubePage() {
   const [podcastLink, setPodcastLink] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredPodcasts, setFilteredPodcasts] = useState(POPULAR_PODCASTS);
+  const [activeTab, setActiveTab] = useState('favorites');
 
   const handleSubmit = async () => {
     if (!podcastLink.trim()) {
@@ -86,6 +103,17 @@ export default function YouTubePage() {
     });
   };
 
+  const handlePaste = async () => {
+    try {
+      const clipboardContent = await Clipboard.getString();
+      if (clipboardContent) {
+        setPodcastLink(clipboardContent);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to paste from clipboard');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -104,8 +132,6 @@ export default function YouTubePage() {
             <TouchableOpacity onPress={() => router.replace('/') }>
               <Text style={styles.elaraLogoGlow}>elara</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>Add YouTube Podcast</Text>
-            <Text style={styles.subtitle}>Paste a YouTube video URL to start chatting</Text>
           </View>
 
           {/* Input Panel */}
@@ -114,21 +140,24 @@ export default function YouTubePage() {
             borderRadius={20}
             style={styles.inputPanel}
           >
-            <Text style={styles.inputLabel}>YouTube URL</Text>
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="https://youtube.com/watch?v=..."
+                placeholder="Add Youtube Link Here"
                 placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 value={podcastLink}
                 onChangeText={setPodcastLink}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
               />
+              <TouchableOpacity 
+                style={styles.pasteButton}
+                onPress={handlePaste}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.pasteIcon}>⎘</Text>
+              </TouchableOpacity>
             </View>
           </SimpleView>
 
@@ -171,8 +200,9 @@ export default function YouTubePage() {
 
           {/* Podcast Search Widget */}
           <SimpleView
-            intensity="medium"
+            intensity="high"
             borderRadius={20}
+            glowEffect={true}
             style={styles.searchPanel}
           >
             {/* Search Bar at Top */}
@@ -188,32 +218,88 @@ export default function YouTubePage() {
               />
             </View>
 
-            {/* Podcast List */}
-            <View style={styles.podcastList}>
-              {filteredPodcasts.map((podcast, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.podcastItem}
-                  onPress={() => handlePodcastSelect(podcast)}
-                  activeOpacity={0.7}
-                >
-                  <SimpleView
-                    intensity="low"
-                    borderRadius={12}
-                    style={styles.podcastCard}
-                  >
-                    <View style={styles.podcastInfo}>
-                      <Text style={styles.podcastName}>{podcast.name}</Text>
-                      <Text style={styles.podcastChannel}>@{podcast.channel}</Text>
-                      <Text style={styles.podcastDescription}>{podcast.description}</Text>
-                    </View>
-                    <View style={styles.linkIcon}>
-                      <Text style={styles.linkIconText}>🔗</Text>
-                    </View>
-                  </SimpleView>
-                </TouchableOpacity>
-              ))}
+            {/* Tab Navigation */}
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'favorites' && styles.activeTab]}
+                onPress={() => setActiveTab('favorites')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.tabText, activeTab === 'favorites' && styles.activeTabText]}>
+                  Favorites
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'new' && styles.activeTab]}
+                onPress={() => setActiveTab('new')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.tabText, activeTab === 'new' && styles.activeTabText]}>
+                  New
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {/* Content based on active tab */}
+            {activeTab === 'favorites' ? (
+              <View style={styles.podcastList}>
+                {FAVORITE_CHANNELS.map((podcast, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.podcastItem}
+                    onPress={() => handlePodcastSelect(podcast)}
+                    activeOpacity={0.7}
+                  >
+                    <SimpleView
+                      intensity="medium"
+                      borderRadius={12}
+                      glowEffect={true}
+                      style={styles.podcastCard}
+                    >
+                      <View style={styles.podcastInfo}>
+                        <Text style={styles.podcastName}>{podcast.name}</Text>
+                        <Text style={styles.podcastChannel}>@{podcast.channel}</Text>
+                        <Text style={styles.podcastDescription}>{podcast.description}</Text>
+                      </View>
+                      <View style={styles.linkIcon}>
+                        <Text style={styles.linkIconText}>🔗</Text>
+                      </View>
+                    </SimpleView>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.podcastList}>
+                {NEW_EPISODES.map((episode, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.podcastItem}
+                    onPress={() => {
+                      // Handle episode selection
+                      Alert.alert('Episode', `Play: ${episode.title}`);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <SimpleView
+                      intensity="medium"
+                      borderRadius={12}
+                      glowEffect={true}
+                      style={styles.podcastCard}
+                    >
+                      <View style={styles.podcastInfo}>
+                        <Text style={styles.podcastName}>{episode.title}</Text>
+                        <Text style={styles.podcastChannel}>@{episode.channel}</Text>
+                        <Text style={styles.podcastDescription}>{episode.description}</Text>
+                      </View>
+                      <View style={styles.episodeInfo}>
+                        <Text style={styles.episodeDuration}>{episode.duration}</Text>
+                        <Text style={styles.playIcon}>▶</Text>
+                      </View>
+                    </SimpleView>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </SimpleView>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -285,13 +371,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   input: {
+    flex: 1,
     padding: 16,
-    fontSize: 16,
+    fontSize: 20,
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '300',
-    minHeight: 80,
+    minHeight: 50,
+  },
+  pasteButton: {
+    paddingTop: 8,
+    paddingBottom: 4,
+    paddingHorizontal: 16,
+    paddingLeft: 16,  
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pasteIcon: {
+    fontSize: 44,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   actionContainer: {
     marginBottom: 30,
@@ -324,6 +425,9 @@ const styles = StyleSheet.create({
   },
   searchPanel: {
     padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   searchContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -338,8 +442,33 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '300',
   },
+  tabContainer: {
+    flexDirection: 'row',
+    marginTop: 20,
+    marginBottom: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  activeTab: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  activeTabText: {
+    color: 'rgba(255, 255, 255, 0.95)',
+  },
   podcastList: {
-    gap: 12,
+    gap: 16,
   },
   podcastItem: {
     // TouchableOpacity wrapper
@@ -348,6 +477,9 @@ const styles = StyleSheet.create({
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
   },
   podcastInfo: {
     flex: 1,
@@ -376,5 +508,19 @@ const styles = StyleSheet.create({
   },
   linkIconText: {
     fontSize: 18,
+  },
+  episodeInfo: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  episodeDuration: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 4,
+  },
+  playIcon: {
+    fontSize: 24,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
 }); 
