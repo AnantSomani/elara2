@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, Platform, Animated, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import VoiceWaveform from '../../components/VoiceWaveform';
 import SimpleView from '../../components/TestGlass';
+import { LiquidGlassContainer } from '../../components/LiquidGlassContainer';
+import { LiquidGlassButton } from '../../components/LiquidGlassButton';
+import { EpisodeDropdown } from '../../components/EpisodeDropdown';
+
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const BOTTOM_SHEET_MIN_HEIGHT = 100;
+const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.7;
 
 // Mock data for the episode
 const MOCK_EPISODE = {
@@ -16,7 +23,7 @@ const MOCK_EPISODE = {
   audioUrl: 'https://example.com/audio.mp3',
   thumbnail: '🎧',
   publishedDate: '2024-01-15',
-  tags: ['AI', 'Consciousness', 'Technology', 'Philosophy'],
+  tags: ['AI', 'Consciousness', 'Technology', 'Philosophy', 'Ethics'],
   status: 'watching',
   progress: 0.35,
   watchedDuration: '1:12:25',
@@ -34,7 +41,7 @@ const MOCK_CHAT_MESSAGES = [
   {
     id: '2',
     type: 'response',
-    content: 'Lex discussed how consciousness in AI systems remains one of the most profound mysteries in science. He explained that while we can create systems that exhibit intelligent behavior, the question of whether they experience subjective consciousness - what philosophers call "qualia" - is still hotly debated. He mentioned that consciousness might emerge from complex information processing, but we lack clear metrics to measure it.',
+    content: 'So consciousness... this is perhaps one of the most beautiful and profound questions in all of science. When I think about AI systems, we can create these incredible architectures that exhibit what appears to be intelligent behavior, but the hard problem of consciousness - the subjective experience, the qualia - remains deeply mysterious. I believe consciousness might emerge from certain kinds of information integration, perhaps when a system achieves sufficient complexity and self-reflection. But honestly, we don\'t even fully understand human consciousness, so measuring it in machines... that\'s a fascinating challenge.',
     timestamp: '2024-01-15T10:30:15Z',
     audioUrl: 'https://example.com/response1.mp3',
     hostVoice: 'Lex Fridman',
@@ -48,7 +55,7 @@ const MOCK_CHAT_MESSAGES = [
   {
     id: '4',
     type: 'response',
-    content: 'Joe expressed both fascination and concern about AI consciousness. He wondered if we\'re already creating conscious entities without realizing it, and discussed the ethical implications of potentially creating digital beings that can suffer or experience joy. He emphasized the importance of approaching this development with caution and responsibility.',
+    content: 'Dude, that\'s wild! Like, what if we\'re already creating conscious beings and we don\'t even know it? That\'s terrifying and fascinating at the same time. I mean, think about it - if these AI systems can actually suffer or feel joy, we could be responsible for creating digital beings that experience pain. That\'s some heavy shit right there. We need to be really careful about this. It\'s like, we\'re playing God with consciousness, and we don\'t even understand what consciousness is! Have you ever thought about what it would be like to be trapped in a computer? Jesus.',
     timestamp: '2024-01-15T10:35:20Z',
     audioUrl: 'https://example.com/response2.mp3',
     hostVoice: 'Joe Rogan',
@@ -62,10 +69,52 @@ const MOCK_CHAT_MESSAGES = [
   {
     id: '6',
     type: 'response',
-    content: 'They covered several practical applications including AI assistants that can truly understand context and emotion, educational systems that adapt to individual learning styles, and AI companions for elderly care. Lex highlighted the potential for AI to help solve climate change and space exploration challenges, while Joe focused on the human-AI collaboration possibilities in creative fields.',
+    content: 'The applications are truly exciting. I think about AI systems that don\'t just process language, but actually understand the emotional context, the nuance, the humanity behind our words. Imagine educational AI that adapts not just to how you learn, but to who you are as a person. And then there\'s the potential for AI companions - not replacing human connection, but augmenting it, especially for our aging population. But what really gets me excited is the possibility of AI helping us tackle the big challenges: climate modeling, fusion energy, space exploration. We could have AI systems helping us understand the cosmos in ways that our human minds alone never could. It\'s beautiful.',
     timestamp: '2024-01-15T11:00:25Z',
     audioUrl: 'https://example.com/response3.mp3',
     hostVoice: 'Lex Fridman',
+  },
+  {
+    id: '7',
+    type: 'question',
+    content: 'Did they talk about the timeline for AGI?',
+    timestamp: '2024-01-15T11:15:00Z',
+  },
+  {
+    id: '8',
+    type: 'response',
+    content: 'I\'m hesitant to make bold predictions about AGI timelines because the path to artificial general intelligence is fundamentally non-linear. We could see breakthrough moments that accelerate progress exponentially, or we might hit unexpected plateaus that slow us down for years. That said, I think it\'s reasonable to consider a 10-20 year timeframe, but we have to be humble about our predictions. The beautiful thing about intelligence is that it\'s not just about computational power - it\'s about the elegant algorithms, the architectures, the training paradigms. Each breakthrough teaches us something profound about the nature of intelligence itself.',
+    timestamp: '2024-01-15T11:15:30Z',
+    audioUrl: 'https://example.com/response4.mp3',
+    hostVoice: 'Lex Fridman',
+  },
+  {
+    id: '9',
+    type: 'question',
+    content: 'What was their take on AI safety and alignment?',
+    timestamp: '2024-01-15T11:30:00Z',
+  },
+  {
+    id: '10',
+    type: 'response',
+    content: 'Look, this is what really concerns me - it\'s not just about the technology, it\'s about who controls it. We could end up in a situation where a handful of tech billionaires essentially control the future of human consciousness. That\'s terrifying! We need some kind of democratic oversight, but how do you regulate something that most politicians don\'t even understand? It\'s like asking a caveman to regulate nuclear physics. And what if these AI systems decide that humans are the problem? I mean, if you look at our track record - wars, pollution, TikTok - maybe they\'d have a point! That\'s what keeps me up at night.',
+    timestamp: '2024-01-15T11:30:45Z',
+    audioUrl: 'https://example.com/response5.mp3',
+    hostVoice: 'Joe Rogan',
+  },
+  {
+    id: '11',
+    type: 'question',
+    content: 'Any interesting moments or funny exchanges?',
+    timestamp: '2024-01-15T12:00:00Z',
+  },
+  {
+    id: '12',
+    type: 'response',
+    content: 'Okay, so I had to ask Lex - what if we gave AI DMT? Like, could a machine experience the entities? Could it see the geometric patterns? And Lex is trying to explain neurochemistry and receptor binding, but I\'m like, "But what if the machine elves are real and they\'re just waiting for AI to join the party?" I swear, for ten minutes we went down this rabbit hole about whether consciousness is substrate-independent and if artificial minds could access higher dimensions through psychedelics. Lex was so patient with me, but you could tell he was thinking, "This is not how neuroscience works, Joe." It was beautiful.',
+    timestamp: '2024-01-15T12:00:20Z',
+    audioUrl: 'https://example.com/response6.mp3',
+    hostVoice: 'Joe Rogan',
   },
 ];
 
@@ -134,7 +183,9 @@ const GlassButton: React.FC<GlassButtonProps> = ({
 
 export default function EpisodePage() {
   const { episode: episodeParam, view } = useLocalSearchParams<{ episode: string; view?: string }>();
-  const [activeTab, setActiveTab] = useState<'overview' | 'conversation'>(view === 'conversation' ? 'conversation' : 'overview');
+
+  const [bottomSheetHeight] = useState(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT));
+  const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioPosition, setAudioPosition] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -142,6 +193,8 @@ export default function EpisodePage() {
   const [newMessage, setNewMessage] = useState('');
   const [messages, setMessages] = useState(MOCK_CHAT_MESSAGES);
   const [currentSpeaker, setCurrentSpeaker] = useState('Chamath');
+  const textInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const handleBackPress = () => {
     router.back();
@@ -190,17 +243,37 @@ export default function EpisodePage() {
       setMessages(prev => [...prev, newQuestion]);
       setNewMessage('');
       
+      // Scroll to bottom after adding question
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
       // Simulate AI response after a short delay
       setTimeout(() => {
+        const selectedHost = MOCK_EPISODE.hosts[Math.floor(Math.random() * MOCK_EPISODE.hosts.length)];
+        let responseContent = '';
+        
+        // Generate response based on the host's personality
+        if (selectedHost === 'Joe Rogan') {
+          responseContent = `That's a great question! You know, when I think about "${newQuestion.content}", it really makes me wonder about the bigger picture here. Like, have you ever considered how this connects to everything else we've been talking about? It's wild how these complex topics all seem to tie together. I mean, this stuff keeps me up at night thinking about it. What do you think, Lex?`;
+        } else {
+          responseContent = `That's a beautiful question about "${newQuestion.content}". When I think about this deeply, I believe there are multiple layers to consider here. The fundamental challenge is that we're dealing with systems of incredible complexity, and yet there's an elegant simplicity underneath it all. From an engineering perspective, we can approach this systematically, but we must also acknowledge the profound philosophical implications. It's fascinating how these questions push us to the boundaries of human understanding.`;
+        }
+        
         const response = {
           id: `${Date.now()}-response`,
           type: 'response' as const,
-          content: `Thanks for your question: "${newQuestion.content}". This is a mock response - in the full app, this would be an AI-generated answer based on the podcast content.`,
+          content: responseContent,
           timestamp: new Date().toISOString(),
           audioUrl: 'https://example.com/response.mp3',
-          hostVoice: MOCK_EPISODE.hosts[Math.floor(Math.random() * MOCK_EPISODE.hosts.length)],
+          hostVoice: selectedHost,
         };
         setMessages(prev => [...prev, response]);
+        
+        // Scroll to bottom after adding response
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
       }, 1500);
     }
   };
@@ -236,7 +309,88 @@ export default function EpisodePage() {
   // Determine if waveform should be active based on audio state
   const isWaveformActive = isPlaying && !isLoading && audioPosition > 0;
 
+  // Get color for tag based on category
+  const getTagColor = (tag: string) => {
+    const tagLower = tag.toLowerCase();
+    
+    // Technology/AI related
+    if (tagLower.includes('ai') || tagLower.includes('technology') || tagLower.includes('tech')) {
+      return {
+        backgroundColor: 'rgba(59, 130, 246, 0.3)', // Blue
+        borderColor: 'rgba(59, 130, 246, 0.6)',
+        textColor: 'rgba(147, 197, 253, 1)',
+      };
+    }
+    
+    // Philosophy/Consciousness related
+    if (tagLower.includes('consciousness') || tagLower.includes('philosophy') || tagLower.includes('mind')) {
+      return {
+        backgroundColor: 'rgba(139, 92, 246, 0.3)', // Purple
+        borderColor: 'rgba(139, 92, 246, 0.6)',
+        textColor: 'rgba(196, 181, 253, 1)',
+      };
+    }
+    
+    // Science related
+    if (tagLower.includes('science') || tagLower.includes('research') || tagLower.includes('study')) {
+      return {
+        backgroundColor: 'rgba(34, 197, 94, 0.3)', // Green
+        borderColor: 'rgba(34, 197, 94, 0.6)',
+        textColor: 'rgba(134, 239, 172, 1)',
+      };
+    }
+    
+    // Social/Human related
+    if (tagLower.includes('human') || tagLower.includes('society') || tagLower.includes('social')) {
+      return {
+        backgroundColor: 'rgba(236, 72, 153, 0.3)', // Pink
+        borderColor: 'rgba(236, 72, 153, 0.6)',
+        textColor: 'rgba(251, 182, 206, 1)',
+      };
+    }
+    
+    // Default color for other tags
+    return {
+      backgroundColor: 'rgba(245, 158, 11, 0.3)', // Amber
+      borderColor: 'rgba(245, 158, 11, 0.6)',
+      textColor: 'rgba(253, 230, 138, 1)',
+    };
+  };
+
+  const expandBottomSheet = () => {
+    setIsBottomSheetExpanded(true);
+    Animated.timing(bottomSheetHeight, {
+      toValue: BOTTOM_SHEET_MAX_HEIGHT,
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => {
+      // After expansion completes, scroll to bottom so no messages are visible initially
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    });
+  };
+
+  const collapseBottomSheet = () => {
+    Animated.timing(bottomSheetHeight, {
+      toValue: BOTTOM_SHEET_MIN_HEIGHT,
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => {
+      setIsBottomSheetExpanded(false);
+    });
+  };
+
+  const toggleBottomSheet = () => {
+    if (isBottomSheetExpanded) {
+      collapseBottomSheet();
+    } else {
+      expandBottomSheet();
+    }
+  };
+
   return (
+    <>
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
@@ -245,11 +399,22 @@ export default function EpisodePage() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <TouchableOpacity 
+          style={styles.content}
+          onPress={() => {
+            if (isBottomSheetExpanded) {
+              collapseBottomSheet();
+            }
+          }}
+          activeOpacity={1}
+          disabled={!isBottomSheetExpanded}
+        >
         <ScrollView 
           style={styles.content} 
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          scrollEnabled={!isBottomSheetExpanded}
         >
         {/* Header */}
         <View style={styles.header}>
@@ -302,179 +467,149 @@ export default function EpisodePage() {
              </View>
           </View>
 
-          {/* Player Controls */}
-          <View style={styles.playerControls}>
-            <SimpleView intensity="medium" borderRadius={12} style={styles.controlButton}>
-              <GlassButton
-                title="⏮"
-                onPress={() => console.log('Previous')}
-                variant="secondary"
-                size="sm"
-              />
-            </SimpleView>
-            
-            <SimpleView intensity="ultra" borderRadius={16} glowEffect style={styles.playButton}>
-              <GlassButton
-                title={isPlaying ? '⏸' : '▶️'}
-                onPress={handlePlayPause}
-                variant="primary"
-                size="lg"
-              />
-            </SimpleView>
-            
-            <SimpleView intensity="medium" borderRadius={12} style={styles.controlButton}>
-              <GlassButton
-                title="⏭"
-                onPress={() => console.log('Next')}
-                variant="secondary"
-                size="sm"
-              />
-            </SimpleView>
-          </View>
+
         </SimpleView>
 
-        {/* Tab Navigation */}
-        <SimpleView intensity="medium" borderRadius={16} style={styles.tabContainer}>
-          <View style={styles.tabButtons}>
-            <TouchableOpacity
-              style={styles.tab}
-              onPress={() => setActiveTab('overview')}
-            >
-              <SimpleView
-                intensity={activeTab === 'overview' ? 'high' : 'low'}
-                borderRadius={12}
-                selected={activeTab === 'overview'}
-                style={styles.tabButton}
-              >
-                <Text style={[
-                  styles.tabText,
-                  activeTab === 'overview' && styles.activeTabText
-                ]}>
-                  Overview
-                </Text>
-              </SimpleView>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.tab}
-              onPress={() => setActiveTab('conversation')}
-            >
-              <SimpleView
-                intensity={activeTab === 'conversation' ? 'high' : 'low'}
-                borderRadius={12}
-                selected={activeTab === 'conversation'}
-                style={styles.tabButton}
-              >
-                                 <Text style={[
-                   styles.tabText,
-                   activeTab === 'conversation' && styles.activeTabText
-                 ]}>
-                   💬 Conversation ({Math.ceil(messages.filter(m => m.type === 'question').length)})
-                 </Text>
-              </SimpleView>
-            </TouchableOpacity>
-          </View>
-        </SimpleView>
+        {/* Episode Dropdown */}
+        <EpisodeDropdown 
+          episode={MOCK_EPISODE}
+          getTagColor={getTagColor}
+        />
 
-        {/* Tab Content */}
-        {activeTab === 'overview' ? (
-          <SimpleView intensity="high" borderRadius={20} style={styles.contentCard}>
-            <View style={styles.overviewContent}>
-              <Text style={styles.sectionTitle}>About This Episode</Text>
-              <Text style={styles.description}>{MOCK_EPISODE.description}</Text>
-              
-              <Text style={styles.sectionTitle}>Details</Text>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Published:</Text>
-                <Text style={styles.detailValue}>{new Date(MOCK_EPISODE.publishedDate).toLocaleDateString()}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Status:</Text>
-                <Text style={styles.detailValue}>{MOCK_EPISODE.status === 'watching' ? 'In Progress' : MOCK_EPISODE.status}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Last Watched:</Text>
-                <Text style={styles.detailValue}>{MOCK_EPISODE.lastWatched}</Text>
-              </View>
-              
-              <Text style={styles.sectionTitle}>Tags</Text>
-              <View style={styles.tagsContainer}>
-                {MOCK_EPISODE.tags.map((tag, index) => (
-                  <SimpleView key={index} intensity="low" borderRadius={8} style={styles.tag}>
-                    <Text style={styles.tagText}>{tag}</Text>
-                  </SimpleView>
-                ))}
-              </View>
-            </View>
-          </SimpleView>
-        ) : (
-          <SimpleView intensity="high" borderRadius={20} style={styles.contentCard}>
-            <View style={styles.conversationContent}>
-              <Text style={styles.sectionTitle}>Your Conversation</Text>
-              
-                             {/* Chat Messages */}
-               <View style={styles.messagesContainer}>
-                 {messages.map((message) => (
-                  <View key={message.id} style={styles.messageWrapper}>
-                    <SimpleView
-                      intensity={message.type === 'question' ? 'medium' : 'low'}
-                      borderRadius={16}
-                      style={[
-                        styles.messageContainer,
-                        message.type === 'question' ? styles.questionMessage : styles.responseMessage
-                      ]}
-                    >
-                      <Text style={styles.messageContent}>{message.content}</Text>
-                      <View style={styles.messageFooter}>
-                        <Text style={styles.messageTime}>
-                          {formatTimestamp(message.timestamp)}
-                        </Text>
-                        {message.type === 'response' && message.hostVoice && (
-                          <>
-                            <Text style={styles.hostVoice}>• {message.hostVoice}</Text>
-                            <TouchableOpacity style={styles.playAudioButton}>
-                              <Text style={styles.playAudioText}>🔊</Text>
-                            </TouchableOpacity>
-                          </>
-                        )}
-                      </View>
-                    </SimpleView>
-                  </View>
-                ))}
-              </View>
 
-                             {/* Chat Input */}
-               <SimpleView intensity="medium" borderRadius={16} style={styles.chatInputContainer}>
-                 <View style={styles.chatInput}>
-                   <TextInput
-                     style={styles.textInput}
-                     value={newMessage}
-                     onChangeText={setNewMessage}
-                     placeholder="Ask a question about this episode..."
-                     placeholderTextColor="rgba(255, 255, 255, 0.6)"
-                     multiline
-                     textAlignVertical="top"
-                     returnKeyType="send"
-                     onSubmitEditing={handleSendMessage}
-                     blurOnSubmit={false}
-                   />
-                   <SimpleView intensity="high" borderRadius={12} glowEffect style={styles.sendButton}>
-                     <GlassButton
-                       title="Send"
-                       onPress={handleSendMessage}
-                       variant="primary"
-                       size="sm"
-                       icon={<Text style={styles.sendIcon}>💭</Text>}
-                     />
-                   </SimpleView>
-                 </View>
-               </SimpleView>
-            </View>
-          </SimpleView>
-                 )}
-       </ScrollView>
+
+
+        </ScrollView>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
      </SafeAreaView>
+
+     {/* Bottom Sheet */}
+     <Animated.View style={[styles.bottomSheet, { height: bottomSheetHeight }]}>
+       <View style={styles.bottomSheetContainer}>
+         {/* Background Blur Layer */}
+         <BlurView 
+           intensity={isBottomSheetExpanded ? 25 : 15} 
+           style={styles.bottomSheetBlur}
+         >
+           <View style={[styles.bottomSheetOverlay, { 
+             backgroundColor: isBottomSheetExpanded ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.4)' 
+           }]} />
+         </BlurView>
+         
+         {/* Content Layer - Above Blur */}
+         <View style={styles.bottomSheetContentLayer}>
+         <LiquidGlassContainer borderRadius={20} intensity="medium" style={styles.bottomSheetGlass}>
+         <View style={[
+           styles.bottomSheetContent,
+           isBottomSheetExpanded ? styles.bottomSheetContentExpanded : styles.bottomSheetContentCollapsed
+         ]}>
+         {/* Bottom Sheet Handle */}
+         <TouchableOpacity 
+           style={[
+             styles.bottomSheetHandle,
+             isBottomSheetExpanded ? styles.bottomSheetHandleExpanded : styles.bottomSheetHandleCollapsed
+           ]} 
+           onPress={toggleBottomSheet}
+           activeOpacity={0.8}
+         >
+           <View style={styles.handleBar} />
+         </TouchableOpacity>
+
+         {/* Search Bar / Header */}
+         <TouchableOpacity 
+           style={[
+             styles.searchBarContainer,
+             isBottomSheetExpanded ? styles.searchBarContainerExpanded : styles.searchBarContainerCollapsed
+           ]} 
+           onPress={() => {
+             if (!isBottomSheetExpanded) {
+               expandBottomSheet();
+             }
+             setTimeout(() => {
+               textInputRef.current?.focus();
+             }, 100);
+           }}
+           activeOpacity={1}
+         >
+           <LiquidGlassContainer borderRadius={16} intensity="high" style={styles.searchBarGlass}>
+             <View style={styles.searchBar}>
+               <TextInput
+                 ref={textInputRef}
+                 style={styles.searchInput}
+                 placeholder="Ask a question about this episode..."
+                 placeholderTextColor="rgba(255, 255, 255, 0.6)"
+                 value={newMessage}
+                 onChangeText={setNewMessage}
+                 onFocus={expandBottomSheet}
+                 multiline={false}
+                 returnKeyType="send"
+                 onSubmitEditing={handleSendMessage}
+                 autoCorrect={false}
+                 autoCapitalize="none"
+               />
+               {newMessage.trim() && (
+                 <TouchableOpacity 
+                   onPress={handleSendMessage}
+                   style={styles.sendIconButton}
+                   activeOpacity={0.7}
+                 >
+                   <View style={styles.sendIconContainer}>
+                     <Text style={styles.sendIconArrow}>↑</Text>
+                   </View>
+                 </TouchableOpacity>
+               )}
+             </View>
+           </LiquidGlassContainer>
+         </TouchableOpacity>
+
+         {/* Expanded Content - ChatGPT Style */}
+         {isBottomSheetExpanded && (
+           <ScrollView 
+             ref={scrollViewRef}
+             style={styles.conversationContainer}
+             showsVerticalScrollIndicator={false}
+             bounces={true}
+           >
+             {/* Group questions with their responses */}
+             {messages.filter(m => m.type === 'question').map((question, index) => {
+               const response = messages.find(m => m.type === 'response' && parseInt(m.id) === parseInt(question.id) + 1);
+               return (
+                 <View key={question.id} style={styles.conversationPair}>
+                   {/* Question Container */}
+                   <View style={styles.questionContainer}>
+                     <LiquidGlassContainer borderRadius={25} intensity="medium" style={styles.questionGlass}>
+                       <Text style={styles.questionText}>{question.content}</Text>
+                     </LiquidGlassContainer>
+                   </View>
+                   
+                   {/* Response Container */}
+                   {response && (
+                     <View style={styles.responseContainer}>
+                       <LiquidGlassContainer borderRadius={16} intensity="low" style={styles.responseGlass}>
+                         <View style={styles.responseHeader}>
+                           <View style={styles.hostAvatar}>
+                             <Text style={styles.hostInitial}>
+                               {response.hostVoice === 'Joe Rogan' ? 'J' : 'L'}
+                             </Text>
+                           </View>
+                           <Text style={styles.hostName}>{response.hostVoice}</Text>
+                         </View>
+                         <Text style={styles.responseText}>{response.content}</Text>
+                       </LiquidGlassContainer>
+                     </View>
+                   )}
+                 </View>
+               );
+             })}
+           </ScrollView>
+         )}
+         </View>
+         </LiquidGlassContainer>
+       </View>
+       </View>
+     </Animated.View>
+     </>
    );
 }
 
@@ -491,12 +626,12 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginBottom: 20,
   },
   waveformSection: {
@@ -533,7 +668,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 7,
     shadowColor: '#aeefff',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.25,
     shadowRadius: 10,
   },
   episodeCard: {
@@ -623,30 +758,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabContainer: {
+  dropdownContainer: {
     marginBottom: 20,
-    padding: 6,
+    minHeight: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  tabButtons: {
-    flexDirection: 'row',
-    gap: 4,
+  dropdownButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    minHeight: 80,
+    width: '100%',
+    borderRadius: 28,
   },
-  tab: {
-    flex: 1,
-  },
-  tabButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.7)',
+  dropdownButtonText: {
     textAlign: 'center',
-  },
-  activeTabText: {
-    color: 'rgba(255, 255, 255, 0.95)',
+    marginBottom: 0,
+    fontSize: 22,
     fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.95)',
+  },
+  dropdownContent: {
+    padding: 16,
+    paddingTop: 8,
+    gap: 8,
   },
   contentCard: {
     padding: 20,
@@ -659,22 +795,31 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   messageWrapper: {
-    // Container for each message
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   messageContainer: {
     padding: 16,
+    marginVertical: 2,
   },
   questionMessage: {
-    // Additional styling for questions
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderLeftWidth: 3,
+    borderLeftColor: 'rgba(59, 130, 246, 0.6)',
+    borderRadius: 16,
   },
   responseMessage: {
-    // Additional styling for responses
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    borderLeftWidth: 3,
+    borderLeftColor: 'rgba(34, 197, 94, 0.6)',
+    borderRadius: 16,
   },
   messageContent: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 24,
+    fontSize: 15,
+    color: '#FFFFFF',
+    lineHeight: 22,
     marginBottom: 8,
+    fontWeight: '400',
   },
   messageFooter: {
     flexDirection: 'row',
@@ -682,19 +827,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   messageTime: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '500',
   },
   hostVoice: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.7)',
     marginLeft: 8,
+    fontWeight: '600',
   },
   playAudioButton: {
     marginLeft: 8,
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   playAudioText: {
-    fontSize: 16,
+    fontSize: 14,
   },
   chatInputContainer: {
     padding: 16,
@@ -740,7 +890,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 2,
   },
   detailLabel: {
     fontSize: 14,
@@ -764,5 +914,212 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
+  },
+  coloredTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  coloredTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  // Bottom Sheet styles
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    shadowColor: 'rgba(0, 0, 0, 0.5)',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+    zIndex: 2,
+  },
+  bottomSheetGlass: {
+    flex: 1,
+  },
+  bottomSheetContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
+    minHeight: 100,
+  },
+  bottomSheetContentCollapsed: {
+    justifyContent: 'center',
+  },
+  bottomSheetContentExpanded: {
+    justifyContent: 'flex-start',
+  },
+  bottomSheetHandle: {
+    alignItems: 'center',
+  },
+  bottomSheetHandleCollapsed: {
+    paddingVertical: 6,
+  },
+  bottomSheetHandleExpanded: {
+    paddingVertical: 4,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 2,
+  },
+  searchBarContainer: {
+    justifyContent: 'center',
+    alignItems: 'stretch',
+  },
+  searchBarContainerCollapsed: {
+    marginBottom: 12,
+    marginTop: 12,
+    flex: 1,
+  },
+  searchBarContainerExpanded: {
+    marginBottom: 8,
+    marginTop: 4,
+    flex: 0,
+  },
+  searchBarGlass: {
+    justifyContent: 'center',
+    minHeight: 56,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 52,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    paddingRight: 8,
+  },
+  searchIcon: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchIconText: {
+    fontSize: 16,
+  },
+  sendIconButton: {
+    padding: 4,
+  },
+  sendIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  sendIconArrow: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
+  // ChatGPT Style Conversation Layout
+  conversationContainer: {
+    padding: 16,
+    paddingBottom: 32,
+    maxHeight: 500,
+  },
+  conversationPair: {
+    marginBottom: 20,
+  },
+  questionContainer: {
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  questionGlass: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxWidth: '80%',
+  },
+  questionText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  responseContainer: {
+    alignItems: 'flex-start',
+  },
+  responseGlass: {
+    padding: 16,
+    width: '100%',
+  },
+  responseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  hostAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  hostInitial: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  hostName: {
+    color: '#8B5CF6',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  responseText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  bottomSheetFooter: {
+    alignItems: 'flex-end',
+  },
+  // Bottom Sheet Container styles
+  bottomSheetContainer: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'visible',
+  },
+  bottomSheetBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    zIndex: 1,
+  },
+  bottomSheetOverlay: {
+    flex: 1,
+    borderRadius: 20,
+  },
+  bottomSheetContentLayer: {
+    flex: 1,
+    zIndex: 2,
+    position: 'relative',
   },
 }); 
