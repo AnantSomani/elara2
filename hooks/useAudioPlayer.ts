@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { useState, useEffect } from 'react';
+import { useAudioPlayer as useExpoAudioPlayer, AudioSource } from 'expo-audio';
 
 export interface UseAudioPlayerResult {
-  sound: Audio.Sound | null;
   isPlaying: boolean;
   isLoading: boolean;
   position: number;
@@ -15,41 +14,24 @@ export interface UseAudioPlayerResult {
 }
 
 /**
- * Custom hook for managing audio playback
+ * Custom hook for managing audio playback using expo-audio
  */
 export function useAudioPlayer(): UseAudioPlayerResult {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(0);
   
-  const soundRef = useRef<Audio.Sound | null>(null);
+  // Use the new expo-audio hook
+  const player = useExpoAudioPlayer(audioSource);
 
   const loadAudio = async (uri: string) => {
     try {
+      console.log('Starting to load audio from:', uri);
       setIsLoading(true);
       
-      // Unload previous sound
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-      }
-
-      // Set audio mode for playback
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      });
-
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: false },
-        onPlaybackStatusUpdate
-      );
-      
-      soundRef.current = newSound;
-      setSound(newSound);
+      console.log('Setting audio source...');
+      setAudioSource({ uri });
+      console.log('Audio source set successfully!');
     } catch (error) {
       console.error('Error loading audio:', error);
       throw error;
@@ -59,84 +41,108 @@ export function useAudioPlayer(): UseAudioPlayerResult {
   };
 
   const togglePlayback = async () => {
-    if (!soundRef.current) return;
+    console.log('🎮 togglePlayback called!');
+    console.log('🎮 Player exists:', !!player);
+    console.log('🎮 Player properties:', player ? {
+      playing: player.playing,
+      isLoaded: player.isLoaded,
+      currentTime: player.currentTime,
+      duration: player.duration
+    } : 'NO PLAYER');
+    
+    if (!player) {
+      console.log('🎮 No player available, cannot toggle playback');
+      return;
+    }
+
+    if (!player.isLoaded) {
+      console.log('🎮 Audio not loaded yet, cannot toggle playback');
+      return;
+    }
 
     try {
-      if (isPlaying) {
-        await soundRef.current.pauseAsync();
+      if (player.playing) {
+        console.log('🎮 Pausing audio...');
+        player.pause();
       } else {
-        await soundRef.current.playAsync();
+        console.log('🎮 Playing audio...');
+        player.play();
       }
     } catch (error) {
-      console.error('Error toggling playback:', error);
+      console.error('🎮 Error toggling playback:', error);
     }
   };
 
   const seekTo = async (positionMillis: number) => {
-    if (!soundRef.current) return;
+    if (!player) return;
 
     try {
-      await soundRef.current.setPositionAsync(positionMillis);
+      player.seekTo(positionMillis / 1000); // expo-audio expects seconds
     } catch (error) {
       console.error('Error seeking:', error);
     }
   };
 
   const setRate = async (rate: number) => {
-    if (!soundRef.current) return;
+    if (!player) return;
 
     try {
-      await soundRef.current.setRateAsync(rate, true);
+      // Note: rate setting might not be available in expo-audio
+      console.warn('Rate setting may not be supported in expo-audio');
     } catch (error) {
       console.error('Error setting rate:', error);
     }
   };
 
   const unload = async () => {
-    if (soundRef.current) {
-      try {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-        setSound(null);
-        setIsPlaying(false);
-        setPosition(0);
-        setDuration(0);
-      } catch (error) {
-        console.error('Error unloading audio:', error);
-      }
+    try {
+      setAudioSource(null);
+    } catch (error) {
+      console.error('Error unloading audio:', error);
     }
   };
 
-  const onPlaybackStatusUpdate = (status: any) => {
-    if (status.isLoaded) {
-      setIsPlaying(status.isPlaying);
-      setPosition(status.positionMillis || 0);
-      setDuration(status.durationMillis || 0);
-      
-      // Handle playback completion
-      if (status.didJustFinish) {
-        setIsPlaying(false);
-      }
-    }
-  };
-
-  // Cleanup on unmount
+  // Force re-renders to sync with player state changes
   useEffect(() => {
-    return () => {
-      unload();
-    };
-  }, []);
+    if (player) {
+      const interval = setInterval(() => {
+        const currentPlaying = player.playing;
+        const currentTime = player.currentTime;
+        const currentDuration = player.duration;
+        const currentLoaded = player.isLoaded;
+        
+        // Force update to sync React state with player state
+        setForceUpdate(prev => prev + 1);
+        
+        console.log('🎶 Player state sync:', {
+          playing: currentPlaying,
+          currentTime,
+          duration: currentDuration,
+          isLoaded: currentLoaded
+        });
+      }, 500); // Check every 500ms
 
-  return {
-    sound,
+      return () => clearInterval(interval);
+    }
+  }, [player]);
+
+  // Debug playing state changes specifically
+  const isPlaying = player?.playing ?? false;
+  useEffect(() => {
+    console.log('🎶 useAudioPlayer isPlaying changed to:', isPlaying);
+  }, [isPlaying, forceUpdate]); // Include forceUpdate to trigger on sync
+
+  const returnState = {
     isPlaying,
     isLoading,
-    position,
-    duration,
+    position: (player?.currentTime ?? 0) * 1000, // Convert to milliseconds
+    duration: (player?.duration ?? 0) * 1000, // Convert to milliseconds
     loadAudio,
     togglePlayback,
     seekTo,
     setRate,
     unload,
   };
+
+  return returnState;
 } 

@@ -13,7 +13,7 @@ import {
 import { router } from 'expo-router';
 import { GlassButton } from '../components/GlassButton';
 import VoiceWaveform from '../components/VoiceWaveform';
-import { LiquidGlassContainer } from '../components/LiquidGlassContainer';
+import { LiquidGlassButton } from '../components/LiquidGlassButton';
 
 const { width, height } = Dimensions.get('window');
 
@@ -82,7 +82,7 @@ export default function HomePage() {
         </View>
 
         {/* Action Buttons */}
-        <LiquidGlassContainer borderRadius={28} intensity="high" style={{ marginBottom: 40, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
+        <LiquidGlassButton borderRadius={28} intensity="high" style={{ marginBottom: 40, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
           <Pressable
             style={({ pressed }) => [
               {
@@ -99,8 +99,8 @@ export default function HomePage() {
           >
             <Text style={[styles.chatTitle, { textAlign: 'center', marginBottom: 0, fontSize: 26 }]}>Continue Podcasts</Text>
           </Pressable>
-        </LiquidGlassContainer>
-        <LiquidGlassContainer borderRadius={28} intensity="high" style={{ marginBottom: 24, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
+        </LiquidGlassButton>
+        <LiquidGlassButton borderRadius={28} intensity="high" style={{ marginBottom: 24, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
           <Pressable
             style={({ pressed }) => [
               {
@@ -117,14 +117,14 @@ export default function HomePage() {
           >
             <Text style={[styles.chatTitle, { textAlign: 'center', marginBottom: 0, fontSize: 26 }]}>Add from YouTube</Text>
           </Pressable>
-        </LiquidGlassContainer>
+        </LiquidGlassButton>
 
         {/* Chat with Friends Panel */}
-        <LiquidGlassContainer borderRadius={28} intensity="high" style={{ padding: 12, marginTop: 16, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
+        <LiquidGlassButton borderRadius={28} intensity="high" style={{ padding: 12, marginTop: 16, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
           <View style={[styles.chatPanel, { alignItems: 'center', justifyContent: 'center', padding: 0, minHeight: 80 }]}> 
             <Text style={[styles.chatTitle, { textAlign: 'center', marginBottom: 0, fontSize: 26 }]}>Chat with Friends</Text>
           </View>
-        </LiquidGlassContainer>
+        </LiquidGlassButton>
       </ScrollView>
     </SafeAreaView>
   );

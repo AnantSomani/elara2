@@ -2,11 +2,12 @@ import React, { useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, Platform, Animated, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { BlurView } from 'expo-blur';
-import VoiceWaveform from '../../components/VoiceWaveform';
+import PlayableWaveform from '../../components/PlayableWaveform';
 import SimpleView from '../../components/TestGlass';
 import { LiquidGlassContainer } from '../../components/LiquidGlassContainer';
 import { LiquidGlassButton } from '../../components/LiquidGlassButton';
 import { EpisodeDropdown } from '../../components/EpisodeDropdown';
+import { useAudioPlayer } from '../../hooks';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOTTOM_SHEET_MIN_HEIGHT = 100;
@@ -20,7 +21,7 @@ const MOCK_EPISODE = {
   hosts: ['Joe Rogan', 'Lex Fridman'],
   duration: '3:24:15',
   description: 'A deep dive into artificial intelligence, consciousness, and the future of humanity with leading AI researcher Lex Fridman.',
-  audioUrl: 'https://example.com/audio.mp3',
+  audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
   thumbnail: '🎧',
   publishedDate: '2024-01-15',
   tags: ['AI', 'Consciousness', 'Technology', 'Philosophy', 'Ethics'],
@@ -186,10 +187,16 @@ export default function EpisodePage() {
 
   const [bottomSheetHeight] = useState(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT));
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioPosition, setAudioPosition] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // Use the audio player hook
+  const {
+    isPlaying,
+    isLoading,
+    position: audioPosition,
+    duration: audioDuration,
+    loadAudio,
+    togglePlayback,
+  } = useAudioPlayer();
   const [newMessage, setNewMessage] = useState('');
   const [messages, setMessages] = useState(MOCK_CHAT_MESSAGES);
   const [currentSpeaker, setCurrentSpeaker] = useState('Chamath');
@@ -204,31 +211,25 @@ export default function EpisodePage() {
     router.replace('/');
   };
 
-  const handlePlayPause = () => {
-    if (isLoading) return;
-    
-    setIsLoading(true);
-    // Simulate audio loading
-    setTimeout(() => {
-      setIsPlaying(!isPlaying);
-      setIsLoading(false);
-      
-      // Simulate audio progress updates
-      if (!isPlaying) {
-        const interval = setInterval(() => {
-          setAudioPosition(prev => {
-            const newPosition = prev + 1;
-            if (newPosition >= audioDuration) {
-              clearInterval(interval);
-              setIsPlaying(false);
-              return 0;
-            }
-            return newPosition;
-          });
-        }, 1000);
-      }
-    }, 500);
-  };
+  // Load audio when component mounts
+  React.useEffect(() => {
+    if (MOCK_EPISODE.audioUrl) {
+      console.log('🎧 Episode: Loading audio:', MOCK_EPISODE.audioUrl);
+      loadAudio(MOCK_EPISODE.audioUrl).catch(error => {
+        console.error('🎧 Episode: Error loading podcast audio:', error);
+      });
+    }
+  }, []);
+
+  // Debug all state changes
+  React.useEffect(() => {
+    console.log('🎧 Episode: Audio state update:', { 
+      isPlaying, 
+      isLoading, 
+      audioPosition: Math.floor(audioPosition), 
+      audioDuration: Math.floor(audioDuration) 
+    });
+  }, [isPlaying, isLoading, audioPosition, audioDuration]);
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
@@ -300,11 +301,7 @@ export default function EpisodePage() {
     setCurrentSpeaker(getCurrentSpeaker());
   }, [messages]);
 
-  // Initialize audio duration from mock episode
-  React.useEffect(() => {
-    const durationInSeconds = 3 * 60 + 24; // 3:24:15 converted to seconds
-    setAudioDuration(durationInSeconds);
-  }, []);
+
 
   // Determine if waveform should be active based on audio state
   const isWaveformActive = isPlaying && !isLoading && audioPosition > 0;
@@ -425,13 +422,13 @@ export default function EpisodePage() {
 
         {/* Voice Waveform Component */}
         <View style={styles.waveformSection}>
-          <VoiceWaveform 
-            hostName={currentSpeaker}
-            isActive={isWaveformActive}
-            isPaused={isPlaying && !isWaveformActive}
-            intensity="ultra"
+          <PlayableWaveform
+            isPlaying={isPlaying}
+            isLoading={isLoading}
+            onTogglePlayback={togglePlayback}
             size={160}
-            audioLevel={isWaveformActive ? 0.7 : 0.3}
+            barCount={20}
+            color="rgba(80,120,255,0.92)"
           />
           {isLoading && (
             <Text style={styles.loadingText}>Loading audio...</Text>

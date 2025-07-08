@@ -3,7 +3,7 @@ import { View, StyleSheet, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
-interface LiquidGlassContainerProps {
+interface LiquidGlassButtonProps {
   children: React.ReactNode;
   borderRadius?: number;
   style?: ViewStyle;
@@ -11,13 +11,13 @@ interface LiquidGlassContainerProps {
   iridescent?: boolean;
 }
 
-export function LiquidGlassContainer({
+export function LiquidGlassButton({
   children,
   borderRadius = 16,
   style,
   intensity = 'medium',
   iridescent = false,
-}: LiquidGlassContainerProps) {
+}: LiquidGlassButtonProps) {
   const getIntensityStyles = () => {
     switch (intensity) {
       case 'low':
@@ -48,6 +48,15 @@ export function LiquidGlassContainer({
   if (iridescent) {
     return (
       <View style={[styles.container, { borderRadius: borderRadius + 1 }, style]}>
+        {/* Blur background */}
+        <BlurView
+          intensity={20}
+          style={[
+            styles.blurContainer,
+            { borderRadius: borderRadius + 1 },
+          ]}
+        />
+        
         {/* Iridescent border */}
         <LinearGradient
           colors={[
@@ -68,7 +77,7 @@ export function LiquidGlassContainer({
         {/* Content container */}
         <View
           style={[
-            styles.content,
+            styles.buttonContent,
             {
               backgroundColor: intensityStyles.backgroundColor,
               borderRadius,
@@ -80,30 +89,45 @@ export function LiquidGlassContainer({
             },
           ]}
         >
-          {children}
+          <View style={styles.contentWrapper}>
+            {children}
+          </View>
         </View>
       </View>
     );
   }
 
   return (
-    <View
-      style={[
-        styles.defaultContainer,
-        {
-          backgroundColor: intensityStyles.backgroundColor,
-          borderColor: intensityStyles.borderColor,
-          borderRadius,
-          shadowColor: 'rgba(255, 255, 255, 0.2)',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.25,
-          shadowRadius: 15,
-          elevation: 8,
-        },
-        style,
-      ]}
-    >
-      {children}
+    <View style={[styles.container, { borderRadius }, style]}>
+      {/* Blur background */}
+      <BlurView
+        intensity={20}
+        style={[
+          styles.blurContainer,
+          { borderRadius },
+        ]}
+      />
+      
+      {/* Content overlay */}
+      <View
+        style={[
+          styles.buttonOverlay,
+          {
+            backgroundColor: intensityStyles.backgroundColor,
+            borderColor: intensityStyles.borderColor,
+            borderRadius,
+            shadowColor: 'rgba(255, 255, 255, 0.2)',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.25,
+            shadowRadius: 15,
+            elevation: 8,
+          },
+        ]}
+      >
+        <View style={styles.contentWrapper}>
+          {children}
+        </View>
+      </View>
     </View>
   );
 }
@@ -119,7 +143,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  contentOverlay: {
+  buttonOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -127,6 +151,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1,
     borderWidth: 1,
+  },
+  buttonContent: {
+    flex: 1,
+    margin: 1,
+    overflow: 'hidden',
   },
   contentWrapper: {
     flex: 1,
@@ -141,14 +170,5 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 1,
-  },
-  content: {
-    flex: 1,
-    margin: 1,
-    overflow: 'hidden',
-  },
-  defaultContainer: {
-    borderWidth: 1,
-    overflow: 'hidden',
   },
 }); 

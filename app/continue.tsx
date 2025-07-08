@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { GlassButton } from '../components/GlassButton';
+import { LiquidGlassContainer } from '../components/LiquidGlassContainer';
 import SimpleView from '../components/TestGlass';
 
 const { width } = Dimensions.get('window');
@@ -21,6 +22,7 @@ const MOCK_EPISODES = [
     id: 'ep1',
     title: 'All-In E149: Dario Amodei CEO of Anthropic',
     channel: 'All-In Podcast',
+    description: 'The besties dive deep into AI safety, scaling laws, and constitutional AI with Anthropic\'s CEO. Discussion covers the future of AI development, safety protocols, and the race to AGI.',
     duration: '1h 42m',
     watchedDuration: '45m',
     progress: 0.44, // 44% watched
@@ -29,11 +31,13 @@ const MOCK_EPISODES = [
     hosts: ['Chamath', 'Sacks', 'Friedberg', 'Jason'],
     conversationCount: 12,
     lastWatched: '2 hours ago',
+    releaseDate: 'December 15, 2024',
   },
   {
     id: 'ep2',
     title: 'The Joe Rogan Experience #2086 - Marc Andreessen',
     channel: 'PowerfulJRE',
+    description: 'Marc Andreessen discusses the future of technology, AI regulation, political censorship, and the intersection of Silicon Valley with government policy. A wide-ranging conversation about innovation and freedom.',
     duration: '2h 15m',
     watchedDuration: '2h 15m',
     progress: 1.0, // 100% completed
@@ -42,24 +46,13 @@ const MOCK_EPISODES = [
     hosts: ['Joe Rogan'],
     conversationCount: 8,
     lastWatched: '1 day ago',
-  },
-  {
-    id: 'ep3',
-    title: 'Lex Fridman Podcast #402 - Sam Altman',
-    channel: 'Lex Fridman Podcast',
-    duration: '1h 28m',
-    watchedDuration: '0m',
-    progress: 0.0, // Not started
-    status: 'new',
-    thumbnail: '🧠',
-    hosts: ['Lex Fridman'],
-    conversationCount: 0,
-    lastWatched: 'Added 3 days ago',
+    releaseDate: 'December 10, 2024',
   },
   {
     id: 'ep4',
     title: 'Huberman Lab: How to Improve Your Sleep',
     channel: 'Andrew Huberman',
+    description: 'Dr. Huberman breaks down the science of sleep optimization, covering sleep hygiene, circadian rhythms, supplements, and evidence-based protocols for better rest and recovery.',
     duration: '1h 55m',
     watchedDuration: '1h 23m',
     progress: 0.72, // 72% watched
@@ -68,11 +61,13 @@ const MOCK_EPISODES = [
     hosts: ['Dr. Andrew Huberman'],
     conversationCount: 5,
     lastWatched: '5 days ago',
+    releaseDate: 'December 8, 2024',
   },
 ];
 
 export default function ContinuePage() {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'watching' | 'completed'>('all');
+  const [expandedEpisodes, setExpandedEpisodes] = useState<Set<string>>(new Set());
 
   const handleHomePress = () => {
     router.replace('/');
@@ -87,14 +82,24 @@ export default function ContinuePage() {
     router.push(`/${episode.id}?view=conversation`);
   };
 
+  const toggleEpisodeExpansion = (episodeId: string) => {
+    setExpandedEpisodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(episodeId)) {
+        newSet.delete(episodeId);
+      } else {
+        newSet.add(episodeId);
+      }
+      return newSet;
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'watching':
         return '#FFA500'; // Orange
       case 'completed':
         return '#10B981'; // Green
-      case 'new':
-        return '#3B82F6'; // Blue
       default:
         return 'rgba(255, 255, 255, 0.7)';
     }
@@ -106,16 +111,16 @@ export default function ContinuePage() {
         return 'In Progress';
       case 'completed':
         return 'Completed';
-      case 'new':
-        return 'Not Started';
       default:
         return status;
     }
   };
 
   const getFilteredEpisodes = () => {
-    if (selectedFilter === 'all') return MOCK_EPISODES;
-    return MOCK_EPISODES.filter(ep => ep.status === selectedFilter);
+    // Filter out "new" episodes since this page is only for started/completed podcasts
+    const startedEpisodes = MOCK_EPISODES.filter(ep => ep.status !== 'new');
+    if (selectedFilter === 'all') return startedEpisodes;
+    return startedEpisodes.filter(ep => ep.status === selectedFilter);
   };
 
   const formatProgress = (progress: number) => {
@@ -135,14 +140,12 @@ export default function ContinuePage() {
           <TouchableOpacity onPress={() => router.replace('/') }>
             <Text style={styles.elaraLogoGlow}>elara</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Continue Podcasts</Text>
-          <Text style={styles.subtitle}>Pick up where you left off or explore your conversations</Text>
         </View>
 
         {/* Filter Tabs */}
-        <SimpleView
+        <LiquidGlassContainer
           intensity="medium"
-          borderRadius={16}
+          borderRadius={20}
           style={styles.filterContainer}
         >
           <View style={styles.filterTabs}>
@@ -154,133 +157,164 @@ export default function ContinuePage() {
                   selectedFilter === filter && styles.activeFilterTab,
                 ]}
                 onPress={() => setSelectedFilter(filter as any)}
+                activeOpacity={0.7}
               >
-                <SimpleView
-                  intensity={selectedFilter === filter ? "high" : "low"}
-                  borderRadius={12}
-                  selected={selectedFilter === filter}
-                  style={styles.filterTabGlass}
-                >
-                  <Text style={[
-                    styles.filterTabText,
-                    selectedFilter === filter && styles.activeFilterTabText,
-                  ]}>
-                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                  </Text>
-                </SimpleView>
+                {selectedFilter === filter && (
+                  <LiquidGlassContainer
+                    intensity="high"
+                    borderRadius={16}
+                    style={styles.activeFilterTabGlass}
+                  >
+                    <View />
+                  </LiquidGlassContainer>
+                )}
+                <Text style={[
+                  styles.filterTabText,
+                  selectedFilter === filter && styles.activeFilterTabText,
+                ]}>
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
-        </SimpleView>
+        </LiquidGlassContainer>
 
         {/* Episodes List */}
         <View style={styles.episodesList}>
           {getFilteredEpisodes().map((episode) => (
-            <SimpleView
+            <LiquidGlassContainer
               key={episode.id}
               intensity="high"
-              borderRadius={20}
+              borderRadius={24}
               style={styles.episodeCard}
             >
               <View style={styles.episodeContent}>
-                {/* Episode Header */}
-                <View style={styles.episodeHeader}>
-                  <Text style={styles.episodeThumbnail}>{episode.thumbnail}</Text>
+                {/* Collapsed Header - Always Visible */}
+                <TouchableOpacity 
+                  style={styles.episodeHeader}
+                  onPress={() => toggleEpisodeExpansion(episode.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.progressIndicatorContainer}>
+                    {/* Background circle */}
+                    <View style={styles.progressIndicatorBackground} />
+                    
+                    {/* Progress circle overlay */}
+                    {episode.progress > 0 && (
+                      <View 
+                        style={[
+                          styles.progressIndicatorProgress,
+                          {
+                            borderColor: episode.progress === 1.0 ? '#10B981' : '#3B82F6',
+                            transform: [{ rotate: '0deg' }],
+                          }
+                        ]}
+                      >
+                        <View 
+                          style={[
+                            styles.progressMask,
+                            {
+                              transform: [{ rotate: `${episode.progress * 360}deg` }],
+                            }
+                          ]}
+                        />
+                      </View>
+                    )}
+                    
+                    {/* Content */}
+                    <View style={styles.progressContent}>
+                      {episode.progress === 1.0 ? (
+                        <Text style={styles.checkmarkIcon}>✓</Text>
+                      ) : (
+                        <Text style={styles.percentageText}>{formatProgress(episode.progress)}</Text>
+                      )}
+                    </View>
+                  </View>
                   <View style={styles.episodeInfo}>
                     <Text style={styles.episodeTitle} numberOfLines={2}>
                       {episode.title}
                     </Text>
                     <Text style={styles.episodeChannel}>{episode.channel}</Text>
-                    <Text style={styles.episodeHosts}>
-                      with {episode.hosts.join(', ')}
-                    </Text>
                   </View>
-                  <View style={styles.episodeStatus}>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(episode.status) }]}>
-                      <Text style={styles.statusText}>{getStatusText(episode.status)}</Text>
-                    </View>
-                  </View>
-                </View>
+                </TouchableOpacity>
 
-                {/* Progress Bar */}
-                {episode.progress > 0 && (
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressInfo}>
-                      <Text style={styles.progressText}>
-                        {episode.watchedDuration} of {episode.duration} • {formatProgress(episode.progress)}
-                      </Text>
-                      <Text style={styles.lastWatchedText}>{episode.lastWatched}</Text>
-                    </View>
-                    <View style={styles.progressBarContainer}>
-                      <View style={styles.progressBarBackground}>
-                        <View 
-                          style={[
-                            styles.progressBarFill, 
-                            { width: `${episode.progress * 100}%` }
-                          ]} 
-                        />
+                {/* Expanded Content - Only when expanded */}
+                {expandedEpisodes.has(episode.id) && (
+                  <View style={styles.expandedContent}>
+                    <Text style={styles.episodeDescription}>{episode.description}</Text>
+                    <Text style={styles.releaseDate}>{episode.releaseDate}</Text>
+
+                    {/* Progress Bar */}
+                    {episode.progress > 0 && (
+                      <View style={styles.progressSection}>
+                        <View style={styles.progressTimeInfo}>
+                          <Text style={styles.progressText}>{episode.watchedDuration}</Text>
+                          <Text style={styles.progressText}>{episode.duration}</Text>
+                        </View>
+                        <View style={styles.progressBarContainer}>
+                          <View style={styles.progressBarBackground}>
+                            <View 
+                              style={[
+                                styles.progressBarFill, 
+                                { width: `${episode.progress * 100}%` }
+                              ]} 
+                            />
+                            <View 
+                              style={[
+                                styles.progressDot, 
+                                { left: `${episode.progress * 100}%` }
+                              ]}
+                            >
+                              <Text style={styles.progressPercentage}>{formatProgress(episode.progress)}</Text>
+                            </View>
+                          </View>
+                        </View>
                       </View>
+                    )}
+
+                    {/* Episode Actions */}
+                    <View style={styles.episodeActions}>
+                      {episode.conversationCount > 0 && (
+                        <LiquidGlassContainer
+                          intensity="medium"
+                          borderRadius={16}
+                          style={styles.fullWidthButtonContainer}
+                        >
+                          <GlassButton
+                            title="View Chat"
+                            onPress={() => handleViewConversation(episode)}
+                            variant="secondary"
+                            size="md"
+                            style={styles.fullWidthButton}
+                          />
+                        </LiquidGlassContainer>
+                      )}
+                      
+                      <LiquidGlassContainer
+                        intensity="high"
+                        borderRadius={16}
+                        style={styles.fullWidthButtonContainer}
+                      >
+                        <GlassButton
+                          title={episode.status === 'completed' ? 'Listen Again' : 'Continue'}
+                          onPress={() => handleEpisodePress(episode.id)}
+                          variant="primary"
+                          size="md"
+                          style={styles.fullWidthButton}
+                        />
+                      </LiquidGlassContainer>
                     </View>
                   </View>
                 )}
-
-                {/* Episode Actions */}
-                <View style={styles.episodeActions}>
-                  <View style={styles.conversationInfo}>
-                    <Text style={styles.conversationCount}>
-                      💬 {episode.conversationCount} conversation{episode.conversationCount !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.actionButtons}>
-                    {episode.conversationCount > 0 && (
-                      <SimpleView
-                        intensity="medium"
-                        borderRadius={12}
-                        style={styles.secondaryButtonContainer}
-                      >
-                        <GlassButton
-                          title="View Chat"
-                          onPress={() => handleViewConversation(episode)}
-                          variant="secondary"
-                          size="sm"
-                          style={styles.secondaryButton}
-                        />
-                      </SimpleView>
-                    )}
-                    
-                    <SimpleView
-                      intensity="ultra"
-                      borderRadius={12}
-                      glowEffect={true}
-                      style={styles.primaryButtonContainer}
-                    >
-                      <GlassButton
-                        title={episode.status === 'completed' ? 'Listen Again' : 'Continue'}
-                        onPress={() => handleEpisodePress(episode.id)}
-                        variant="primary"
-                        size="sm"
-                        style={styles.primaryButton}
-                        icon={
-                          <View style={styles.buttonIcon}>
-                            <Text style={styles.iconText}>
-                              {episode.status === 'completed' ? '🔄' : '▶'}
-                            </Text>
-                          </View>
-                        }
-                      />
-                    </SimpleView>
-                  </View>
-                </View>
               </View>
-            </SimpleView>
+            </LiquidGlassContainer>
           ))}
         </View>
 
         {getFilteredEpisodes().length === 0 && (
-          <SimpleView
+          <LiquidGlassContainer
             intensity="medium"
-            borderRadius={20}
+            borderRadius={24}
             style={styles.emptyStateContainer}
           >
             <View style={styles.emptyState}>
@@ -292,9 +326,9 @@ export default function ContinuePage() {
                   : `No ${selectedFilter} episodes yet`
                 }
               </Text>
-              <SimpleView
+              <LiquidGlassContainer
                 intensity="high"
-                borderRadius={12}
+                borderRadius={16}
                 style={styles.emptyStateButtonContainer}
               >
                 <GlassButton
@@ -309,9 +343,9 @@ export default function ContinuePage() {
                     </View>
                   }
                 />
-              </SimpleView>
+              </LiquidGlassContainer>
             </View>
-          </SimpleView>
+          </LiquidGlassContainer>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -374,19 +408,28 @@ const styles = StyleSheet.create({
   },
   filterTab: {
     flex: 1,
-  },
-  filterTabGlass: {
+    position: 'relative',
     paddingVertical: 12,
     paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activeFilterTab: {
     // Additional styling handled by SimpleView selected prop
+  },
+  activeFilterTabGlass: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   filterTabText: {
     fontSize: 14,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
+    zIndex: 1,
   },
   activeFilterTabText: {
     color: 'rgba(255, 255, 255, 0.95)',
@@ -406,13 +449,133 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
   },
-  episodeThumbnail: {
-    fontSize: 40,
+  dropdownArrow: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 24,
+    height: 24,
+  },
+  dropdownArrowText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  expandedContent: {
+    gap: 16,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  progressIndicator: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    position: 'relative',
+  },
+  progressIndicatorContainer: {
+    width: 60,
+    height: 60,
+    position: 'relative',
+  },
+  progressIndicatorBackground: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    position: 'absolute',
+  },
+  progressIndicatorProgress: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+    overflow: 'hidden',
+  },
+  progressMask: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 30,
+    top: 0,
+    left: 0,
+  },
+  progressContent: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  checkmarkIcon: {
+    fontSize: 24,
+    color: '#10B981',
+    fontWeight: 'bold',
+  },
+  percentageText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontWeight: '700',
     textAlign: 'center',
-    width: 50,
+  },
+  pieChartContainer: {
+    width: 56,
+    height: 56,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pieChartBackground: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  pieChartMask: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  pieChartProgress: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 4,
+    borderColor: '#3B82F6',
+    borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: 'transparent',
+    transformOrigin: 'center',
+  },
+  pieChartCenter: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   episodeInfo: {
     flex: 1,
+    marginLeft: 12,
   },
   episodeTitle: {
     fontSize: 16,
@@ -446,10 +609,25 @@ const styles = StyleSheet.create({
   progressSection: {
     gap: 8,
   },
-  progressInfo: {
+  progressTimeInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  episodeDescription: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: 'rgba(255, 255, 255, 0.85)',
+    lineHeight: 16,
+    marginBottom: 0,
+  },
+  releaseDate: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'left',
+    marginBottom: 5,
+    marginTop: -2,
   },
   progressText: {
     fontSize: 13,
@@ -474,22 +652,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#3B82F6',
     borderRadius: 2,
   },
-  episodeActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  progressDot: {
+    position: 'absolute',
+    top: -4,
+    width: 12,
+    height: 12,
+    backgroundColor: 'white',
+    borderRadius: 6,
+    marginLeft: -6,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  conversationInfo: {
-    flex: 1,
+  progressPercentage: {
+    position: 'absolute',
+    top: -24,
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    textAlign: 'center',
+    minWidth: 32,
   },
-  conversationCount: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
+  episodeActions: {
+    flexDirection: 'column',
+    gap: 12,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
+  fullWidthButtonContainer: {
+    width: '100%',
+  },
+  fullWidthButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    shadowOpacity: 0,
+    elevation: 0,
+    width: '100%',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
   },
   secondaryButtonContainer: {
     // SimpleView will handle styling

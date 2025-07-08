@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useAudioPlayer } from '../hooks';
+import PlayableWaveform from './PlayableWaveform';
 
 interface PodcastPlayerProps {
   title: string;
@@ -43,15 +44,13 @@ export default function PodcastPlayer({ title, audioUrl, hosts }: PodcastPlayerP
       <Text style={styles.hosts}>Hosts: {hosts.join(', ')}</Text>
       
       <View style={styles.playerContainer}>
-        <TouchableOpacity 
-          style={[styles.playButton, isLoading && styles.playButtonDisabled]}
-          onPress={togglePlayback}
-          disabled={isLoading}
-        >
-          <Text style={styles.playButtonText}>
-            {isLoading ? '⏳' : isPlaying ? '⏸️' : '▶️'}
-          </Text>
-        </TouchableOpacity>
+        <PlayableWaveform
+          isPlaying={isPlaying}
+          isLoading={isLoading}
+          onTogglePlayback={togglePlayback}
+          size={48}
+          barCount={15}
+        />
         
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
@@ -90,22 +89,7 @@ const styles = StyleSheet.create({
   playerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  playButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3b82f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  playButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  playButtonText: {
-    fontSize: 20,
-    color: 'white',
+    gap: 12,
   },
   progressContainer: {
     flex: 1,
