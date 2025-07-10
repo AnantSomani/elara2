@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
 import { Alert } from 'react-native';
 
 export interface UseVoiceRecordingResult {
@@ -20,12 +20,12 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   
-  const recordingRef = useRef<Audio.Recording | null>(null);
-  const durationInterval = useRef<NodeJS.Timeout | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const requestPermissions = async (): Promise<boolean> => {
     try {
-      const { status } = await Audio.requestPermissionsAsync();
+      const { status } = await AudioModule.requestRecordingPermissionsAsync();
       return status === 'granted';
     } catch (error) {
       console.error('Error requesting audio permissions:', error);
@@ -45,19 +45,10 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
         return;
       }
 
-      // Configure audio mode for recording
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-      });
-
-      // Create and start recording
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+      // Prepare and start recording
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
       
-      recordingRef.current = recording;
       setIsRecording(true);
       setDuration(0);
 
@@ -73,8 +64,6 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   };
 
   const stopRecording = async (): Promise<string | null> => {
-    if (!recordingRef.current) return null;
-
     try {
       setIsRecording(false);
       
@@ -84,11 +73,10 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
         durationInterval.current = null;
       }
 
-      // Stop and get URI
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
+      // Stop recording and get URI
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
       
-      recordingRef.current = null;
       setRecordingUri(uri);
       
       return uri;
