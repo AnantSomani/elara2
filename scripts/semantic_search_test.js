@@ -7,8 +7,12 @@
 const { createClient } = require('@supabase/supabase-js');
 const OpenAI = require('openai');
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+// Load environment variables
+require('dotenv').config({ path: '../.env.local' });
+require('dotenv').config({ path: '../.env' });
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 async function testSemanticSearch(episodeId, query) {
@@ -54,7 +58,7 @@ async function testSemanticSearch(episodeId, query) {
       
       // Fallback: use basic vector similarity
       const { data: fallbackResults, error: fallbackError } = await supabase
-        .from('segments')
+        .from('transcript_segments')
         .select('*, similarity:embedding <-> $1::vector as similarity')
         .eq('episode_id', episodeId)
         .order('similarity')
@@ -67,7 +71,7 @@ async function testSemanticSearch(episodeId, query) {
 
       console.log('📋 Fallback search results:');
       fallbackResults.forEach((result, index) => {
-        const startTime = Math.floor(result.timestamp_start);
+        const startTime = Math.floor(result.start_time);
         const similarity = (1 - result.similarity) * 100;
         console.log(`\n${index + 1}. [${startTime}s] ${result.speaker} (${similarity.toFixed(1)}% match)`);
         console.log(`   "${result.content}"`);
@@ -85,7 +89,7 @@ async function testSemanticSearch(episodeId, query) {
     console.log(`✅ Found ${results.length} matching segments:\n`);
 
     results.forEach((result, index) => {
-      const startTime = Math.floor(result.timestamp_start);
+      const startTime = Math.floor(result.start_time);
       const similarity = (result.similarity * 100).toFixed(1);
       
       console.log(`${index + 1}. [${startTime}s] ${result.speaker} (${similarity}% match)`);
@@ -97,8 +101,8 @@ async function testSemanticSearch(episodeId, query) {
     console.log('3. Testing speaker-specific search...');
     
     const { data: speakerResults, error: speakerError } = await supabase
-      .from('segments')
-      .select('speaker, content, timestamp_start')
+      .from('transcript_segments')
+      .select('speaker, content, start_time')
       .eq('episode_id', episodeId)
       .ilike('content', `%${query.split(' ')[0]}%`)
       .limit(3);
@@ -106,7 +110,7 @@ async function testSemanticSearch(episodeId, query) {
     if (!speakerError && speakerResults?.length > 0) {
       console.log('✅ Speaker-specific matches:');
       speakerResults.forEach((result, index) => {
-        const startTime = Math.floor(result.timestamp_start);
+        const startTime = Math.floor(result.start_time);
         console.log(`   ${result.speaker} [${startTime}s]: "${result.content.substring(0, 100)}..."`);
       });
     }
@@ -132,15 +136,15 @@ CREATE OR REPLACE FUNCTION match_segments (
   query_embedding vector(1536),
   match_threshold float,
   match_count int,
-  episode_filter uuid DEFAULT NULL
+  episode_filter text DEFAULT NULL
 )
 RETURNS TABLE (
   id bigint,
-  episode_id uuid,
+  episode_id text,
   content text,
   speaker text,
-  timestamp_start float8,
-  timestamp_end float8,
+  start_time float8,
+  end_time float8,
   similarity float
 )
 LANGUAGE plpgsql
@@ -148,18 +152,18 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT
-    segments.id,
-    segments.episode_id,
-    segments.content,
-    segments.speaker,
-    segments.timestamp_start,
-    segments.timestamp_end,
-    1 - (segments.embedding <=> query_embedding) as similarity
-  FROM segments
+    transcript_segments.id,
+    transcript_segments.episode_id,
+    transcript_segments.content,
+    transcript_segments.speaker,
+    transcript_segments.start_time,
+    transcript_segments.end_time,
+    1 - (transcript_segments.embedding <=> query_embedding) as similarity
+  FROM transcript_segments
   WHERE 
-    (episode_filter IS NULL OR segments.episode_id = episode_filter)
-    AND 1 - (segments.embedding <=> query_embedding) > match_threshold
-  ORDER BY segments.embedding <=> query_embedding
+    (episode_filter IS NULL OR transcript_segments.episode_id = episode_filter)
+    AND 1 - (transcript_segments.embedding <=> query_embedding) > match_threshold
+  ORDER BY transcript_segments.embedding <=> query_embedding
   LIMIT match_count;
 END;
 $$;

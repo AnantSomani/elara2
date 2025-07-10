@@ -1,6 +1,7 @@
--- Migration 001: AssemblyAI Core Schema Changes
--- Date: 2024-06-30
+-- Migration 001: AssemblyAI Core Schema Changes (CORRECTED)
+-- Date: 2024-12-30
 -- Purpose: Add AssemblyAI-specific columns and processing logs table
+-- Fixed: episode_id type changed from UUID to TEXT to match episodes.id
 
 -- Add AssemblyAI columns to existing episodes table
 ALTER TABLE episodes 
@@ -17,6 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_episodes_assemblyai_status ON episodes(assemblyai
 CREATE INDEX IF NOT EXISTS idx_episodes_speakers ON episodes USING GIN(speakers);
 
 -- Add processing logs table for debugging and audit trail
+-- CORRECTED: Using TEXT for episode_id to match episodes.id type
 CREATE TABLE IF NOT EXISTS processing_logs (
     id BIGSERIAL PRIMARY KEY,
     episode_id TEXT REFERENCES episodes(id),
@@ -43,4 +45,29 @@ COMMENT ON COLUMN episodes.detected_entities IS 'Named entities detected by Asse
 COMMENT ON COLUMN episodes.processing_metadata IS 'AssemblyAI processing metadata and config';
 
 COMMENT ON TABLE processing_logs IS 'Audit trail for all podcast processing operations';
-COMMENT ON COLUMN processing_logs.processing_type IS 'Type: assemblyai_transcription, embedding_generation, etc.'; 
+COMMENT ON COLUMN processing_logs.processing_type IS 'Type: assemblyai_transcription, embedding_generation, etc.';
+
+-- Success message
+DO $$
+BEGIN
+    RAISE NOTICE '';
+    RAISE NOTICE '🎤 ======================================';
+    RAISE NOTICE '🎤 AssemblyAI Core Migration Complete!';
+    RAISE NOTICE '🎤 ======================================';
+    RAISE NOTICE '';
+    RAISE NOTICE '✅ Added AssemblyAI columns to episodes table:';
+    RAISE NOTICE '   - assemblyai_transcript_id (TEXT)';
+    RAISE NOTICE '   - assemblyai_status (TEXT)';
+    RAISE NOTICE '   - speakers (TEXT[])';
+    RAISE NOTICE '   - episode_chapters (JSONB)';
+    RAISE NOTICE '   - detected_entities (JSONB)';
+    RAISE NOTICE '   - processing_metadata (JSONB)';
+    RAISE NOTICE '';
+    RAISE NOTICE '✅ Created processing_logs table:';
+    RAISE NOTICE '   - episode_id (TEXT) → matches episodes.id';
+    RAISE NOTICE '   - processing_type, status, metadata';
+    RAISE NOTICE '   - created_at, updated_at timestamps';
+    RAISE NOTICE '';
+    RAISE NOTICE '🚀 Ready for AssemblyAI processing!';
+    RAISE NOTICE '';
+END $$; 

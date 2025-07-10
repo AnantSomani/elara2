@@ -3,8 +3,8 @@
 // To use real backend, set EXPO_PUBLIC_USE_MOCKS=false
 
 import { useState, useEffect } from 'react';
-import { getEpisodeData, type EpisodeData } from '../lib/api';
-import { subscribeToEpisode } from '../lib/supabase';
+import { getEpisodeData } from '../lib/api';
+import { subscribeToEpisode, type EpisodeData } from '../lib/supabase';
 
 export interface UseEpisodeResult {
   episode: EpisodeData | null;
@@ -37,7 +37,6 @@ if (USE_MOCKS) {
       const data = await getEpisodeData(episodeId);
       setEpisode(data);
     } catch (err) {
-      console.error('Error fetching episode:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch episode');
     } finally {
       setIsLoading(false);
@@ -78,5 +77,4 @@ if (USE_MOCKS) {
   };
 } 
 
-export const useEpisode = useEpisodeImpl;
-export type { UseEpisodeResult } from './useEpisode.mock'; // type is the same for both 
+export const useEpisode = useEpisodeImpl; 

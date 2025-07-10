@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, Platform, Animated, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { BlurView } from 'expo-blur';
@@ -8,6 +8,7 @@ import { LiquidGlassContainer } from '../../components/LiquidGlassContainer';
 import { LiquidGlassButton } from '../../components/LiquidGlassButton';
 import { EpisodeDropdown } from '../../components/EpisodeDropdown';
 import { useAudioPlayer } from '../../hooks';
+import { getEpisode, subscribeToEpisode, type EpisodeData } from '../../lib/supabase';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOTTOM_SHEET_MIN_HEIGHT = 100;
@@ -184,6 +185,11 @@ const GlassButton: React.FC<GlassButtonProps> = ({
 
 export default function EpisodePage() {
   const { episode: episodeParam, view } = useLocalSearchParams<{ episode: string; view?: string }>();
+  
+  // Episode data state
+  const [episode, setEpisode] = useState<EpisodeData | null>(null);
+  const [isLoadingEpisode, setIsLoadingEpisode] = useState(true);
+  const [episodeError, setEpisodeError] = useState<string | null>(null);
 
   const [bottomSheetHeight] = useState(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT));
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
@@ -199,9 +205,60 @@ export default function EpisodePage() {
   } = useAudioPlayer();
   const [newMessage, setNewMessage] = useState('');
   const [messages, setMessages] = useState(MOCK_CHAT_MESSAGES);
-  const [currentSpeaker, setCurrentSpeaker] = useState('Chamath');
+  const [currentSpeaker, setCurrentSpeaker] = useState('Host');
   const textInputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Fetch episode data when component mounts
+  useEffect(() => {
+    const fetchEpisode = async () => {
+      if (!episodeParam) {
+        setEpisodeError('No episode ID provided');
+        setIsLoadingEpisode(false);
+        return;
+      }
+
+      try {
+        const episodeData = await getEpisode(episodeParam);
+        setEpisode(episodeData);
+        setEpisodeError(null);
+        
+        // Load audio if available
+        if (episodeData.audioUrl) {
+          loadAudio(episodeData.audioUrl).catch(error => {
+            console.error('Error loading podcast audio:', error);
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching episode:', error);
+        setEpisodeError(error instanceof Error ? error.message : 'Failed to load episode');
+      } finally {
+        setIsLoadingEpisode(false);
+      }
+    };
+
+    fetchEpisode();
+  }, [episodeParam]);
+
+  // Subscribe to episode changes to get audio URL when ready
+  useEffect(() => {
+    if (!episodeParam) return;
+
+    const subscription = subscribeToEpisode(episodeParam, (updatedEpisode: EpisodeData) => {
+      setEpisode(updatedEpisode);
+      
+      // Load audio when it becomes available
+      if (updatedEpisode.audioUrl && !isPlaying) {
+        loadAudio(updatedEpisode.audioUrl).catch(error => {
+          console.error('Error loading updated podcast audio:', error);
+        });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [episodeParam, isPlaying]);
 
   const handleBackPress = () => {
     router.back();
@@ -211,28 +268,8 @@ export default function EpisodePage() {
     router.replace('/');
   };
 
-  // Load audio when component mounts
-  React.useEffect(() => {
-    if (MOCK_EPISODE.audioUrl) {
-      console.log('🎧 Episode: Loading audio:', MOCK_EPISODE.audioUrl);
-      loadAudio(MOCK_EPISODE.audioUrl).catch(error => {
-        console.error('🎧 Episode: Error loading podcast audio:', error);
-      });
-    }
-  }, []);
-
-  // Debug all state changes
-  React.useEffect(() => {
-    console.log('🎧 Episode: Audio state update:', { 
-      isPlaying, 
-      isLoading, 
-      audioPosition: Math.floor(audioPosition), 
-      audioDuration: Math.floor(audioDuration) 
-    });
-  }, [isPlaying, isLoading, audioPosition, audioDuration]);
-
   const handleSendMessage = () => {
-    if (newMessage.trim()) {
+    if (newMessage.trim() && episode) {
       const newQuestion = {
         id: `${Date.now()}`,
         type: 'question' as const,
@@ -251,14 +288,15 @@ export default function EpisodePage() {
       
       // Simulate AI response after a short delay
       setTimeout(() => {
-        const selectedHost = MOCK_EPISODE.hosts[Math.floor(Math.random() * MOCK_EPISODE.hosts.length)];
+        const episodeHosts = episode.hosts || ['Host'];
+        const selectedHost = episodeHosts[Math.floor(Math.random() * episodeHosts.length)];
         let responseContent = '';
         
         // Generate response based on the host's personality
-        if (selectedHost === 'Joe Rogan') {
-          responseContent = `That's a great question! You know, when I think about "${newQuestion.content}", it really makes me wonder about the bigger picture here. Like, have you ever considered how this connects to everything else we've been talking about? It's wild how these complex topics all seem to tie together. I mean, this stuff keeps me up at night thinking about it. What do you think, Lex?`;
+        if (selectedHost.toLowerCase().includes('joe') || selectedHost.toLowerCase().includes('rogan')) {
+          responseContent = `That's a great question! You know, when I think about "${newQuestion.content}", it really makes me wonder about the bigger picture here. Like, have you ever considered how this connects to everything else we've been talking about? It's wild how these complex topics all seem to tie together. I mean, this stuff keeps me up at night thinking about it. What do you think?`;
         } else {
-          responseContent = `That's a beautiful question about "${newQuestion.content}". When I think about this deeply, I believe there are multiple layers to consider here. The fundamental challenge is that we're dealing with systems of incredible complexity, and yet there's an elegant simplicity underneath it all. From an engineering perspective, we can approach this systematically, but we must also acknowledge the profound philosophical implications. It's fascinating how these questions push us to the boundaries of human understanding.`;
+          responseContent = `That's a fascinating question about "${newQuestion.content}". When I think about this deeply, I believe there are multiple layers to consider here. The fundamental challenge is that we're dealing with systems of incredible complexity, and yet there's an elegant simplicity underneath it all. From an analytical perspective, we can approach this systematically, but we must also acknowledge the broader implications. It's interesting how these questions push us to explore new perspectives.`;
         }
         
         const response = {
@@ -284,24 +322,83 @@ export default function EpisodePage() {
   };
 
   const getProgressWidth = () => {
-    return MOCK_EPISODE.progress;
+    // For now, return 0.35 as default since we don't have progress tracking yet
+    return 0.35;
+  };
+
+  // Helper functions to format episode data
+  const getEpisodeThumbnail = () => {
+    return episode?.thumbnailUrl ? '🎧' : '🎙️'; // Default podcast icon
+  };
+
+  const getEpisodeChannel = () => {
+    return episode?.channelTitle || 'Podcast';
+  };
+
+  const getEpisodeDuration = () => {
+    if (!episode?.durationSeconds) return '0:00';
+    const minutes = Math.floor(episode.durationSeconds / 60);
+    const seconds = episode.durationSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const getWatchedDuration = () => {
+    // For now, calculate 35% of total duration as mock "watched" time
+    if (!episode?.durationSeconds) return '0:00';
+    const watchedSeconds = Math.floor(episode.durationSeconds * 0.35);
+    const minutes = Math.floor(watchedSeconds / 60);
+    const seconds = watchedSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const getEpisodeProgress = () => {
+    return 0.35; // Mock 35% progress for now
   };
 
   // Function to get the current speaker based on the latest conversation
   const getCurrentSpeaker = () => {
+    if (!episode) return 'Host';
+    
     const lastResponse = messages.slice().reverse().find(msg => msg.type === 'response' && msg.hostVoice);
     if (lastResponse && 'hostVoice' in lastResponse) {
-      return lastResponse.hostVoice || MOCK_EPISODE.hosts[0];
+      return lastResponse.hostVoice || episode.hosts?.[0] || 'Host';
     }
-    return MOCK_EPISODE.hosts[0]; // Default to first host
+    return episode.hosts?.[0] || 'Host'; // Default to first host
   };
 
   // Update current speaker when messages change
   React.useEffect(() => {
     setCurrentSpeaker(getCurrentSpeaker());
-  }, [messages]);
+  }, [messages, episode]);
 
+  // Show loading state
+  if (isLoadingEpisode) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading episode...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
+  // Show error state
+  if (episodeError || !episode) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            {episodeError || 'Episode not found'}
+          </Text>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Determine if waveform should be active based on audio state
   const isWaveformActive = isPlaying && !isLoading && audioPosition > 0;
@@ -424,8 +521,8 @@ export default function EpisodePage() {
         <View style={styles.waveformSection}>
           <PlayableWaveform
             isPlaying={isPlaying}
-            isLoading={isLoading}
-            onTogglePlayback={togglePlayback}
+            isLoading={isLoading || !episode.audioUrl}
+            onTogglePlayback={episode.audioUrl ? togglePlayback : () => {}}
             size={160}
             barCount={20}
             color="rgba(80,120,255,0.92)"
@@ -433,43 +530,60 @@ export default function EpisodePage() {
           {isLoading && (
             <Text style={styles.loadingText}>Loading audio...</Text>
           )}
+          {!episode.audioUrl && episode.processingStatus === 'processing' && (
+            <Text style={styles.loadingText}>Processing audio...</Text>
+          )}
+          {!episode.audioUrl && episode.processingStatus === 'pending' && (
+            <Text style={styles.loadingText}>Preparing audio...</Text>
+          )}
         </View>
 
         {/* Episode Info Card */}
         <SimpleView intensity="high" borderRadius={20} style={styles.episodeCard}>
           <View style={styles.episodeHeader}>
-            <Text style={styles.episodeThumbnail}>{MOCK_EPISODE.thumbnail}</Text>
+            <Text style={styles.episodeThumbnail}>{getEpisodeThumbnail()}</Text>
             <View style={styles.episodeInfo}>
-              <Text style={styles.episodeTitle}>{MOCK_EPISODE.title}</Text>
-              <Text style={styles.episodeChannel}>{MOCK_EPISODE.channel}</Text>
-              <Text style={styles.episodeHosts}>with {MOCK_EPISODE.hosts.join(', ')}</Text>
-              <Text style={styles.episodeDuration}>{MOCK_EPISODE.duration}</Text>
+              <Text style={styles.episodeTitle}>{episode.title}</Text>
+              <Text style={styles.episodeChannel}>{getEpisodeChannel()}</Text>
+              <Text style={styles.episodeHosts}>with {(episode.hosts || []).join(', ') || 'Host'}</Text>
+              <Text style={styles.episodeDuration}>{getEpisodeDuration()}</Text>
             </View>
           </View>
-
-          {/* Progress Section */}
-          <View style={styles.progressSection}>
+          
+          {/* Progress Bar */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${getEpisodeProgress() * 100}%` }]} />
+            </View>
             <View style={styles.progressInfo}>
               <Text style={styles.progressText}>
-                {MOCK_EPISODE.watchedDuration} of {MOCK_EPISODE.duration}
+                {getWatchedDuration()} of {getEpisodeDuration()}
               </Text>
               <Text style={styles.progressPercentage}>
-                {Math.round(MOCK_EPISODE.progress * 100)}% complete
+                {Math.round(getEpisodeProgress() * 100)}% complete
               </Text>
             </View>
-                         <View style={styles.progressBarContainer}>
-               <View style={styles.progressBarBackground}>
-                 <View style={[styles.progressBarFill, { width: `${getProgressWidth() * 100}%` }]} />
-               </View>
-             </View>
           </View>
-
-
         </SimpleView>
 
         {/* Episode Dropdown */}
         <EpisodeDropdown 
-          episode={MOCK_EPISODE}
+          episode={{
+            id: episode.id,
+            title: episode.title,
+            thumbnail: getEpisodeThumbnail(),
+            channel: getEpisodeChannel(),
+            duration: getEpisodeDuration(),
+            progress: getEpisodeProgress(),
+            status: episode.processingStatus === 'completed' ? 'completed' : 'watching',
+            watchedDuration: getWatchedDuration(),
+            lastWatched: '2 hours ago', // Mock for now
+            conversationCount: messages.filter(m => m.type === 'question').length,
+            publishedDate: episode.createdAt ? new Date(episode.createdAt).toLocaleDateString() : 'Recent',
+            description: episode.description || 'No description available',
+            tags: ['Podcast', 'Audio'], // Mock tags for now
+            hosts: episode.hosts || [],
+          } as any}
           getTagColor={getTagColor}
         />
 
@@ -534,16 +648,17 @@ export default function EpisodePage() {
                <TextInput
                  ref={textInputRef}
                  style={styles.searchInput}
-                 placeholder="Ask a question about this episode..."
+                 placeholder={episode.processingStatus === 'completed' ? "Ask a question about this episode..." : "Processing episode... Chat will be available soon."}
                  placeholderTextColor="rgba(255, 255, 255, 0.6)"
                  value={newMessage}
                  onChangeText={setNewMessage}
-                 onFocus={expandBottomSheet}
+                 onFocus={episode.processingStatus === 'completed' ? expandBottomSheet : undefined}
                  multiline={false}
                  returnKeyType="send"
-                 onSubmitEditing={handleSendMessage}
+                 onSubmitEditing={episode.processingStatus === 'completed' ? handleSendMessage : undefined}
                  autoCorrect={false}
                  autoCapitalize="none"
+                 editable={episode.processingStatus === 'completed'}
                />
                {newMessage.trim() && (
                  <TouchableOpacity 
@@ -641,19 +756,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: 'italic',
   },
-     backButton: {
-     width: 44,
-     height: 44,
-     alignItems: 'center',
-     justifyContent: 'center',
-   },
-   backButtonText: {
-     fontSize: 24,
-     color: 'rgba(255, 255, 255, 0.9)',
-     fontWeight: '400',
-     textAlign: 'center',
-     lineHeight: 24,
-   },
   elaraLogoGlow: {
     fontSize: 48,
     fontFamily: 'Snell Roundhand',
@@ -1119,4 +1221,48 @@ const styles = StyleSheet.create({
     zIndex: 2,
     position: 'relative',
   },
-}); 
+  progressContainer: {
+    marginTop: 10,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 3,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

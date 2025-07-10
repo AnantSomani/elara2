@@ -4,4 +4,7 @@ supabase>=2.0.0
 python-dotenv>=1.0.0
 yt-dlp>=2023.7.6
 pydub>=0.25.1
-requests>=2.31.0 
+requests>=2.31.0
+# New dependencies for Phase 1
+fastapi>=0.104.0
+uvicorn>=0.24.0 

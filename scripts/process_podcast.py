@@ -74,7 +74,7 @@ class AssemblyAIPodcastProcessor:
         config = aai.TranscriptionConfig(
             # Core features
             speaker_labels=True,  # Enable speaker diarization
-            speakers_expected=4,  # Expected number of speakers
+            # speakers_expected=4,  # Let AssemblyAI auto-detect speakers
             
             # Enhanced features
             auto_chapters=True,   # Auto-detect chapters
@@ -193,11 +193,7 @@ class AssemblyAIPodcastProcessor:
                         'speaker': segment['speaker'],
                         'timestamp_start': segment['start'],
                         'timestamp_end': segment['end'],
-                        'embedding': response.data[0].embedding,
-                        'confidence': segment.get('confidence', 0.9),
-                        'words': segment.get('words', []),
-                        'segment_type': segment.get('segment_type', 'utterance'),
-                        'language_code': segment.get('language_code', 'en')
+                        'embedding': response.data[0].embedding
                     })
                     
                 except Exception as e:
@@ -235,7 +231,6 @@ class AssemblyAIPodcastProcessor:
             
             # Update episode with AssemblyAI data
             episode_update = {
-                'transcript': full_transcript,
                 'processing_status': 'processing',
                 'assemblyai_transcript_id': metadata['assemblyai_transcript_id'],
                 'assemblyai_status': 'completed',
@@ -260,18 +255,14 @@ class AssemblyAIPodcastProcessor:
                     'episode_id': episode_id,
                     'content': segment['content'],
                     'speaker': segment['speaker'],
-                    'timestamp_start': segment['timestamp_start'],
-                    'timestamp_end': segment['timestamp_end'],
-                    'embedding': segment['embedding'],
-                    'confidence': segment.get('confidence', 0.9),
-                    'words': segment.get('words', []),
-                    'segment_type': segment.get('segment_type', 'utterance'),
-                    'language_code': segment.get('language_code', 'en')
+                    'start_time': segment['timestamp_start'],
+                    'end_time': segment['timestamp_end'],
+                    'embedding': segment['embedding']
                 })
             
             # Batch insert segments
             if segment_data:
-            self.supabase.table('segments').insert(segment_data).execute()
+                self.supabase.table('transcript_segments').insert(segment_data).execute()
             
             # Insert processing log entry
             processing_log = {
@@ -373,10 +364,10 @@ class AssemblyAIPodcastProcessor:
             logger.error(f"Error processing podcast: {e}")
             # Update status to failed
             try:
-            self.supabase.table('episodes').update({
+                self.supabase.table('episodes').update({
                     'processing_status': 'failed',
                     'assemblyai_status': 'failed'
-            }).eq('id', episode_id).execute()
+                }).eq('id', episode_id).execute()
             except:
                 pass  # Don't fail on status update error
             raise

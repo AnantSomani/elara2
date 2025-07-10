@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getHostPrompt } from '../constants/prompts';
 
 const ELEVENLABS_API_KEY = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY || '';
 
@@ -162,9 +163,23 @@ export async function validateApiKey(): Promise<boolean> {
 }
 
 /**
- * Map host names to voice IDs
+ * Get host voice ID from database (now async)
  */
-export function getHostVoiceId(hostName: string): string {
+export async function getHostVoiceId(hostName: string): Promise<string> {
+  try {
+    const hostPrompt = await getHostPrompt(hostName);
+    return hostPrompt.voiceId;
+  } catch (error) {
+    console.error('Error getting host voice ID:', error);
+    // Fallback to environment variables if database fails
+    return getFallbackVoiceId(hostName);
+  }
+}
+
+/**
+ * Fallback voice ID mapping using environment variables
+ */
+function getFallbackVoiceId(hostName: string): string {
   const voiceMap: { [key: string]: string } = {
     'chamath': process.env.EXPO_PUBLIC_CHAMATH_VOICE_ID || 'default-voice-id',
     'chamathpalihapitiya': process.env.EXPO_PUBLIC_CHAMATH_VOICE_ID || 'default-voice-id',

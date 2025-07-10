@@ -6,29 +6,56 @@ const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface EpisodeData {
-  id: string;
+  id: string;                    // YouTube video ID
   title: string;
-  audioUrl: string;
-  hosts: string[];
-  transcript?: string;
+  description?: string;
+  youtubeUrl: string;
+  audioUrl?: string;
+  durationSeconds?: number;
+  thumbnailUrl?: string;
+  channelTitle?: string;
   processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  hosts?: string[];              // Array of host names
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SegmentData {
-  id: string;
-  episodeId: string;
+  id: number;
+  episodeId: string;             // YouTube video ID
   content: string;
-  speaker: string;
-  timestampStart: number;
-  timestampEnd: number;
+  speaker: string;               // SPEAKER_00, SPEAKER_01, etc.
+  startTime: number;             // Updated from timestampStart
+  endTime: number;               // Updated from timestampEnd
   embedding?: number[];
+  createdAt?: string;
+}
+
+export interface PodcastHost {
+  id: number;
+  name: string;                  // "Chamath", "Sacks", etc.
+  voiceId: string;               // Vogent speaker ID
+  personalityPrompt: string;     // Host-specific system prompt
+  description?: string;
+  createdAt?: string;
+}
+
+export interface EpisodeSpeaker {
+  id: number;
+  episodeId: string;             // YouTube video ID
+  speakerLabel: string;          // "SPEAKER_00", "SPEAKER_01", etc.
+  speakerName?: string;          // "Chamath", "Sacks", etc.
+  confidenceScore?: number;
+  createdAt?: string;
 }
 
 export interface CreateEpisodeData {
-  youtubeUrl: string;
+  id?: string;                   // Optional YouTube video ID
   title: string;
   description?: string;
-  durationSeconds: number;
+  youtubeUrl: string;
+  audioUrl?: string;
+  durationSeconds?: number;
   thumbnailUrl?: string;
   channelTitle?: string;
 }
@@ -37,34 +64,32 @@ export interface CreateEpisodeData {
  * Create a new episode record in Supabase with YouTube metadata
  */
 export async function createEpisode(episodeData: CreateEpisodeData): Promise<string> {
-  console.log('🔍 Creating episode record:', {
+  const insertData: any = {
+    youtube_url: episodeData.youtubeUrl,
     title: episodeData.title,
-    duration: `${Math.floor(episodeData.durationSeconds / 60)}:${(episodeData.durationSeconds % 60).toString().padStart(2, '0')}`,
-    channel: episodeData.channelTitle,
-  });
-  
+    description: episodeData.description,
+    duration_seconds: episodeData.durationSeconds,
+    thumbnail_url: episodeData.thumbnailUrl,
+    channel_title: episodeData.channelTitle,
+    processing_status: 'pending',
+    created_at: new Date().toISOString(),
+  };
+
+  // If ID is provided, use it instead of auto-generated
+  if (episodeData.id) {
+    insertData.id = episodeData.id;
+  }
+
   const { data, error } = await supabase
     .from('episodes')
-    .insert({
-      youtube_url: episodeData.youtubeUrl,
-      title: episodeData.title,
-      description: episodeData.description,
-      duration_seconds: episodeData.durationSeconds,
-      processing_status: 'pending',
-      created_at: new Date().toISOString(),
-    })
+    .insert(insertData)
     .select()
     .single();
 
   if (error) {
-    console.error('🚨 Supabase error details:', error);
-    console.error('🚨 Error code:', error.code);
-    console.error('🚨 Error message:', error.message);
-    console.error('🚨 Error hint:', error.hint);
     throw error;
   }
   
-  console.log('✅ Episode created successfully with ID:', data.id);
   return data.id;
 }
 
@@ -83,11 +108,88 @@ export async function getEpisode(episodeId: string): Promise<EpisodeData> {
   return {
     id: data.id,
     title: data.title || 'Loading...',
+    description: data.description,
+    youtubeUrl: data.youtube_url,
     audioUrl: data.audio_url || '',
-    hosts: data.hosts || [],
-    transcript: data.transcript,
+    durationSeconds: data.duration_seconds,
+    thumbnailUrl: data.thumbnail_url,
+    channelTitle: data.channel_title,
     processingStatus: data.processing_status,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
   };
+}
+
+/**
+ * Get all podcast hosts
+ */
+export async function getPodcastHosts(): Promise<PodcastHost[]> {
+  const { data, error } = await supabase
+    .from('podcast_hosts')
+    .select('*')
+    .order('name');
+
+  if (error) throw error;
+
+  return data.map(host => ({
+    id: host.id,
+    name: host.name,
+    voiceId: host.voice_id,
+    personalityPrompt: host.personality_prompt,
+    description: host.description,
+    createdAt: host.created_at,
+  }));
+}
+
+/**
+ * Get episode speaker mapping
+ */
+export async function getEpisodeSpeakers(episodeId: string): Promise<EpisodeSpeaker[]> {
+  const { data, error } = await supabase
+    .from('episode_speakers')
+    .select('*')
+    .eq('episode_id', episodeId)
+    .order('confidence_score', { ascending: false });
+
+  if (error) throw error;
+
+  return data.map(speaker => ({
+    id: speaker.id,
+    episodeId: speaker.episode_id,
+    speakerLabel: speaker.speaker_label,
+    speakerName: speaker.speaker_name,
+    confidenceScore: speaker.confidence_score,
+    createdAt: speaker.created_at,
+  }));
+}
+
+/**
+ * Search transcript segments using vector similarity
+ */
+export async function searchSegments(
+  episodeId: string, 
+  queryEmbedding: number[], 
+  similarityThreshold: number = 0.7,
+  matchCount: number = 5
+): Promise<SegmentData[]> {
+  const { data, error } = await supabase.rpc('search_segments', {
+    target_episode_id: episodeId,
+    query_embedding: JSON.stringify(queryEmbedding),
+    similarity_threshold: similarityThreshold,
+    match_count: matchCount,
+  });
+
+  if (error) throw error;
+
+  return data.map((segment: any) => ({
+    id: segment.id,
+    episodeId: episodeId,
+    content: segment.content,
+    speaker: segment.speaker,
+    startTime: segment.start_time,
+    endTime: segment.end_time,
+    embedding: undefined, // Not returned in search results
+  }));
 }
 
 /**
@@ -95,58 +197,15 @@ export async function getEpisode(episodeId: string): Promise<EpisodeData> {
  */
 export async function updateEpisodeStatus(
   episodeId: string, 
-  status: EpisodeData['processingStatus']
+  status: 'pending' | 'processing' | 'completed' | 'failed'
 ): Promise<void> {
   const { error } = await supabase
     .from('episodes')
-    .update({ processing_status: status })
+    .update({ 
+      processing_status: status,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', episodeId);
-
-  if (error) throw error;
-}
-
-/**
- * Search for relevant segments using vector similarity
- */
-export async function searchSegments(
-  episodeId: string,
-  queryEmbedding: number[],
-  similarityThreshold: number = 0.7,
-  matchCount: number = 5
-): Promise<SegmentData[]> {
-  const { data, error } = await supabase.rpc('search_segments', {
-    episode_id: episodeId,
-    query_embedding: queryEmbedding,
-    similarity_threshold: similarityThreshold,
-    match_count: matchCount
-  });
-
-  if (error) throw error;
-
-  return data.map((segment: any) => ({
-    id: segment.id,
-    episodeId: segment.episode_id,
-    content: segment.content,
-    speaker: segment.speaker,
-    timestampStart: segment.timestamp_start,
-    timestampEnd: segment.timestamp_end,
-  }));
-}
-
-/**
- * Insert segments for an episode
- */
-export async function insertSegments(segments: Omit<SegmentData, 'id'>[]): Promise<void> {
-  const { error } = await supabase
-    .from('segments')
-    .insert(segments.map(segment => ({
-      episode_id: segment.episodeId,
-      content: segment.content,
-      speaker: segment.speaker,
-      timestamp_start: segment.timestampStart,
-      timestamp_end: segment.timestampEnd,
-      embedding: segment.embedding,
-    })));
 
   if (error) throw error;
 }
@@ -170,10 +229,15 @@ export function subscribeToEpisode(episodeId: string, callback: (episode: Episod
         callback({
           id: data.id,
           title: data.title || 'Loading...',
+          description: data.description,
+          youtubeUrl: data.youtube_url,
           audioUrl: data.audio_url || '',
-          hosts: data.hosts || [],
-          transcript: data.transcript,
+          durationSeconds: data.duration_seconds,
+          thumbnailUrl: data.thumbnail_url,
+          channelTitle: data.channel_title,
           processingStatus: data.processing_status,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
         });
       }
     )

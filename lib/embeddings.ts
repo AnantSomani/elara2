@@ -1,9 +1,10 @@
 // Embedding and RAG helper functions
 export interface EmbeddingChunk {
-  id: string;
+  id: number;                    // Updated to number for SERIAL primary key
   content: string;
-  speaker: string;
-  timestamp: number;
+  speaker: string;               // SPEAKER_00, SPEAKER_01, etc.
+  startTime: number;             // Updated from timestamp
+  endTime: number;               // New field for end timestamp
   embedding?: number[];
 }
 

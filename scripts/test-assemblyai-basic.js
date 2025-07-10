@@ -7,8 +7,8 @@
 const { createClient } = require('@supabase/supabase-js');
 
 // Load environment variables from multiple sources
-require('dotenv').config({ path: '.env.local' });
-require('dotenv').config({ path: '.env' });
+require('dotenv').config({ path: '../.env.local' });
+require('dotenv').config({ path: '../.env' });
 
 // Helper function to get environment variable with correct mappings
 function getEnvVar(name) {
@@ -113,6 +113,7 @@ async function testDatabaseSchema() {
         const testEpisode = {
             id: TEST_EPISODE_ID,
             title: 'AssemblyAI Test Episode',
+            youtube_url: `https://www.youtube.com/watch?v=${TEST_EPISODE_ID}`,
             processing_status: 'pending',
             assemblyai_status: 'pending',
             speakers: ['Speaker_A', 'Speaker_B'],
@@ -227,6 +228,7 @@ async function testProcessingLogs() {
         const tempEpisode = {
             id: logTestEpisodeId,
             title: 'Processing Logs Test Episode',
+            youtube_url: `https://www.youtube.com/watch?v=${logTestEpisodeId}`,
             processing_status: 'pending'
         };
         

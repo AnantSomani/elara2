@@ -43,4 +43,26 @@ COMMENT ON COLUMN episodes.detected_entities IS 'Named entities detected by Asse
 COMMENT ON COLUMN episodes.processing_metadata IS 'AssemblyAI processing metadata and config';
 
 COMMENT ON TABLE processing_logs IS 'Audit trail for all podcast processing operations';
-COMMENT ON COLUMN processing_logs.processing_type IS 'Type: assemblyai_transcription, embedding_generation, etc.'; 
+COMMENT ON COLUMN processing_logs.processing_type IS 'Type: assemblyai_transcription, embedding_generation, etc.';
+
+-- Success message
+DO $$
+BEGIN
+    RAISE NOTICE '';
+    RAISE NOTICE '🎤 ======================================';
+    RAISE NOTICE '🎤 AssemblyAI Core Migration Complete!';
+    RAISE NOTICE '🎤 ======================================';
+    RAISE NOTICE '';
+    RAISE NOTICE '✅ Added AssemblyAI columns to episodes table:';
+    RAISE NOTICE '   - assemblyai_transcript_id';
+    RAISE NOTICE '   - assemblyai_status';
+    RAISE NOTICE '   - speakers';
+    RAISE NOTICE '   - episode_chapters';
+    RAISE NOTICE '   - detected_entities';
+    RAISE NOTICE '   - processing_metadata';
+    RAISE NOTICE '';
+    RAISE NOTICE '✅ Created processing_logs table for audit trail';
+    RAISE NOTICE '';
+    RAISE NOTICE '🚀 Ready for AssemblyAI processing!';
+    RAISE NOTICE '';
+END $$; 
