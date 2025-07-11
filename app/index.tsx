@@ -9,6 +9,7 @@ import {
   StatusBar,
   ScrollView,
   Pressable,
+  TextInput,
 } from 'react-native';
 import { router } from 'expo-router';
 import { GlassButton } from '../components/GlassButton';
@@ -19,6 +20,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function HomePage() {
   const [isVoiceActive, setIsVoiceActive] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   const handleVoiceToggle = () => {
     setIsVoiceActive(!isVoiceActive);
@@ -34,9 +36,11 @@ export default function HomePage() {
     router.push('/continue');
   };
 
-  const handleYouTubeMode = () => {
-    // Navigate to YouTube input mode
-    router.push('/youtube');
+  const handlePodcastSearch = () => {
+    if (searchQuery.trim()) {
+      // Navigate to search results with query
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
   };
 
   const handleChatWithFriends = () => {
@@ -100,23 +104,31 @@ export default function HomePage() {
             <Text style={[styles.chatTitle, { textAlign: 'center', marginBottom: 0, fontSize: 26 }]}>Continue Podcasts</Text>
           </Pressable>
         </LiquidGlassButton>
-        <LiquidGlassButton borderRadius={28} intensity="high" style={{ marginBottom: 24, minHeight: 80, justifyContent: 'center', alignItems: 'center' }}>
-          <Pressable
-            style={({ pressed }) => [
-              {
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 12,
-                minHeight: 80,
-                width: '100%',
-                backgroundColor: pressed ? 'rgba(30,30,30,0.5)' : 'transparent',
-                borderRadius: 28,
-              },
-            ]}
-            onPress={handleYouTubeMode}
-          >
-            <Text style={[styles.chatTitle, { textAlign: 'center', marginBottom: 0, fontSize: 26 }]}>Add from YouTube</Text>
-          </Pressable>
+
+        {/* Podcast Search Interface */}
+        <LiquidGlassButton borderRadius={28} intensity="high" style={{ marginBottom: 24, minHeight: 120, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={styles.searchContainer}>
+            <TextInput
+              placeholder="Search podcasts (e.g., All-In Podcast)"
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handlePodcastSearch}
+              style={styles.searchInput}
+              returnKeyType="search"
+            />
+            <Pressable
+              style={({ pressed }) => [
+                styles.searchButton,
+                {
+                  backgroundColor: pressed ? 'rgba(174,239,255,0.8)' : 'rgba(174,239,255,0.6)',
+                },
+              ]}
+              onPress={handlePodcastSearch}
+            >
+              <Text style={styles.searchButtonText}>Search</Text>
+            </Pressable>
+          </View>
         </LiquidGlassButton>
 
         {/* Chat with Friends Panel */}
@@ -176,6 +188,31 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  searchContainer: {
+    width: '100%',
+    padding: 16,
+    gap: 12,
+  },
+  searchInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(174, 239, 255, 0.3)',
+  },
+  searchButton: {
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchButtonText: {
+    color: '#000000',
+    fontSize: 18,
+    fontWeight: '600',
   },
   actionContainer: {
     marginBottom: 40,

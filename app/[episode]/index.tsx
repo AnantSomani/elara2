@@ -14,24 +14,7 @@ const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOTTOM_SHEET_MIN_HEIGHT = 100;
 const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.7;
 
-// Mock data for the episode
-const MOCK_EPISODE = {
-  id: 'episode-1',
-  title: 'The Future of AI and Human Consciousness',
-  channel: 'The Joe Rogan Experience',
-  hosts: ['Joe Rogan', 'Lex Fridman'],
-  duration: '3:24:15',
-  description: 'A deep dive into artificial intelligence, consciousness, and the future of humanity with leading AI researcher Lex Fridman.',
-  audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  thumbnail: '🎧',
-  publishedDate: '2024-01-15',
-  tags: ['AI', 'Consciousness', 'Technology', 'Philosophy', 'Ethics'],
-  status: 'watching',
-  progress: 0.35,
-  watchedDuration: '1:12:25',
-  lastWatched: '2 hours ago',
-  conversationCount: 3,
-};
+// Real episode data will be loaded from navigation parameters
 
 const MOCK_CHAT_MESSAGES = [
   {
@@ -184,12 +167,49 @@ const GlassButton: React.FC<GlassButtonProps> = ({
 };
 
 export default function EpisodePage() {
-  const { episode: episodeParam, view } = useLocalSearchParams<{ episode: string; view?: string }>();
+  const { 
+    episodeId, 
+    podcastId, 
+    podcastTitle, 
+    episodeTitle, 
+    audioUrl, 
+    episodeData,
+    view 
+  } = useLocalSearchParams<{ 
+    episodeId: string; 
+    podcastId: string; 
+    podcastTitle: string; 
+    episodeTitle: string; 
+    audioUrl: string; 
+    episodeData: string;
+    view?: string; 
+  }>();
   
   // Episode data state
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(true);
   const [episodeError, setEpisodeError] = useState<string | null>(null);
+  
+  // Parse episode data from navigation params
+  const currentEpisode = React.useMemo(() => {
+    if (episodeData) {
+      try {
+        return JSON.parse(episodeData);
+      } catch (error) {
+        console.error('Failed to parse episode data:', error);
+      }
+    }
+    // Fallback episode object with navigation params
+    return {
+      id: episodeId,
+      title: episodeTitle || 'Unknown Episode',
+      podcastTitle: podcastTitle || 'Unknown Podcast',
+      enclosureUrl: audioUrl,
+      duration: 0,
+      description: '',
+      datePublished: Date.now() / 1000,
+    };
+  }, [episodeData, episodeId, episodeTitle, podcastTitle, audioUrl]);
 
   const [bottomSheetHeight] = useState(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT));
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
@@ -209,56 +229,33 @@ export default function EpisodePage() {
   const textInputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Fetch episode data when component mounts
+  // Load audio from real podcast CDN URL
   useEffect(() => {
-    const fetchEpisode = async () => {
-      if (!episodeParam) {
-        setEpisodeError('No episode ID provided');
+    const loadEpisodeAudio = async () => {
+      if (!audioUrl) {
+        setEpisodeError('No audio URL provided');
         setIsLoadingEpisode(false);
         return;
       }
 
       try {
-        const episodeData = await getEpisode(episodeParam);
-        setEpisode(episodeData);
+        setIsLoadingEpisode(true);
         setEpisodeError(null);
         
-        // Load audio if available
-        if (episodeData.audioUrl) {
-          loadAudio(episodeData.audioUrl).catch(error => {
-            console.error('Error loading podcast audio:', error);
-          });
-        }
+        console.log('🎵 Loading real podcast audio from CDN:', audioUrl);
+        await loadAudio(audioUrl);
+        console.log('✅ Audio loaded successfully');
+        
       } catch (error) {
-        console.error('Error fetching episode:', error);
-        setEpisodeError(error instanceof Error ? error.message : 'Failed to load episode');
+        console.error('❌ Error loading episode audio:', error);
+        setEpisodeError('Failed to load episode audio');
       } finally {
         setIsLoadingEpisode(false);
       }
     };
 
-    fetchEpisode();
-  }, [episodeParam]);
-
-  // Subscribe to episode changes to get audio URL when ready
-  useEffect(() => {
-    if (!episodeParam) return;
-
-    const subscription = subscribeToEpisode(episodeParam, (updatedEpisode: EpisodeData) => {
-      setEpisode(updatedEpisode);
-      
-      // Load audio when it becomes available
-      if (updatedEpisode.audioUrl && !isPlaying) {
-        loadAudio(updatedEpisode.audioUrl).catch(error => {
-          console.error('Error loading updated podcast audio:', error);
-        });
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [episodeParam, isPlaying]);
+    loadEpisodeAudio();
+  }, [audioUrl, loadAudio]);
 
   const handleBackPress = () => {
     router.back();
@@ -269,7 +266,7 @@ export default function EpisodePage() {
   };
 
   const handleSendMessage = () => {
-    if (newMessage.trim() && episode) {
+    if (newMessage.trim() && currentEpisode) {
       const newQuestion = {
         id: `${Date.now()}`,
         type: 'question' as const,
@@ -288,8 +285,7 @@ export default function EpisodePage() {
       
       // Simulate AI response after a short delay
       setTimeout(() => {
-        const episodeHosts = episode.hosts || ['Host'];
-        const selectedHost = episodeHosts[Math.floor(Math.random() * episodeHosts.length)];
+        const selectedHost = 'Host'; // Simplified for now
         let responseContent = '';
         
         // Generate response based on the host's personality
@@ -326,50 +322,58 @@ export default function EpisodePage() {
     return 0.35;
   };
 
-  // Helper functions to format episode data
+  // Helper functions to format episode data using real episode data
   const getEpisodeThumbnail = () => {
-    return episode?.thumbnailUrl ? '🎧' : '🎙️'; // Default podcast icon
+    return '🎧'; // Podcast icon
   };
 
   const getEpisodeChannel = () => {
-    return episode?.channelTitle || 'Podcast';
+    return currentEpisode?.podcastTitle || podcastTitle || 'Podcast';
   };
 
   const getEpisodeDuration = () => {
-    if (!episode?.durationSeconds) return '0:00';
-    const minutes = Math.floor(episode.durationSeconds / 60);
-    const seconds = episode.durationSeconds % 60;
+    // Use audio duration from player, or fallback to episode duration
+    const durationMillis = audioDuration || (currentEpisode?.duration ? currentEpisode.duration * 1000 : 0);
+    if (!durationMillis) return '0:00';
+    
+    const totalSeconds = Math.floor(durationMillis / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const getWatchedDuration = () => {
-    // For now, calculate 35% of total duration as mock "watched" time
-    if (!episode?.durationSeconds) return '0:00';
-    const watchedSeconds = Math.floor(episode.durationSeconds * 0.35);
+    // Use current audio position for watched duration
+    const watchedMillis = audioPosition || 0;
+    const watchedSeconds = Math.floor(watchedMillis / 1000);
     const minutes = Math.floor(watchedSeconds / 60);
     const seconds = watchedSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const getEpisodeProgress = () => {
-    return 0.35; // Mock 35% progress for now
+    if (!audioDuration) return 0;
+    return Math.min((audioPosition || 0) / audioDuration, 1);
   };
 
-  // Function to get the current speaker based on the latest conversation
+  // Function to get the current speaker - use podcast author as default
   const getCurrentSpeaker = () => {
-    if (!episode) return 'Host';
-    
     const lastResponse = messages.slice().reverse().find(msg => msg.type === 'response' && msg.hostVoice);
     if (lastResponse && 'hostVoice' in lastResponse) {
-      return lastResponse.hostVoice || episode.hosts?.[0] || 'Host';
+      return lastResponse.hostVoice || 'Host';
     }
-    return episode.hosts?.[0] || 'Host'; // Default to first host
+    return 'Host'; // Simple default
   };
 
   // Update current speaker when messages change
   React.useEffect(() => {
     setCurrentSpeaker(getCurrentSpeaker());
-  }, [messages, episode]);
+  }, [messages]);
 
   // Show loading state
   if (isLoadingEpisode) {
@@ -384,7 +388,7 @@ export default function EpisodePage() {
   }
 
   // Show error state
-  if (episodeError || !episode) {
+  if (episodeError || !currentEpisode) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />

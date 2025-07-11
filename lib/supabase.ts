@@ -3,31 +3,53 @@ import { createClient } from '@supabase/supabase-js';
 // Initialize Supabase client
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+
+// Debug logging for environment variables (safe - only shows length/prefix)
+console.log('🔧 Supabase URL configured:', supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING');
+console.log('🔧 Supabase Key configured:', supabaseKey ? `${supabaseKey.substring(0, 20)}...` : 'MISSING');
+
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface EpisodeData {
-  id: string;                    // YouTube video ID
+  id: string;                    // YouTube video ID or podcast episode ID
   title: string;
   description?: string;
-  youtubeUrl: string;
+  youtubeUrl?: string;           // Made optional for podcast episodes
   audioUrl?: string;
   durationSeconds?: number;
   thumbnailUrl?: string;
   channelTitle?: string;
   processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
   hosts?: string[];              // Array of host names
+  
+  // Transcription fields
+  assemblyaiTranscriptId?: string;
+  assemblyaiStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  transcriptId?: string;
+  transcriptionStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  speakers?: string[];
+  episodeChapters?: any[];
+  detectedEntities?: any[];
+  processingMetadata?: any;
+  
+  // Timestamps
+  publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface SegmentData {
   id: number;
-  episodeId: string;             // YouTube video ID
+  episodeId: string;             // Episode ID
   content: string;
-  speaker: string;               // SPEAKER_00, SPEAKER_01, etc.
-  startTime: number;             // Updated from timestampStart
-  endTime: number;               // Updated from timestampEnd
+  speaker: string;               // Kept for backwards compatibility
+  speakerName?: string;          // New field matching database schema
+  startTime: number;             
+  endTime: number;               
   embedding?: number[];
+  confidence?: number;           // Transcription confidence score
+  words?: any[];                 // Word-level data
+  segmentType?: string;          // Type of segment
   createdAt?: string;
 }
 
@@ -50,30 +72,40 @@ export interface EpisodeSpeaker {
 }
 
 export interface CreateEpisodeData {
-  id?: string;                   // Optional YouTube video ID
+  id?: string;                   // Optional YouTube video ID or podcast episode ID
   title: string;
   description?: string;
-  youtubeUrl: string;
+  youtubeUrl?: string;           // Made optional for podcast episodes
   audioUrl?: string;
   durationSeconds?: number;
   thumbnailUrl?: string;
   channelTitle?: string;
+  publishedAt?: string;          // Podcast episode publish date
 }
 
 /**
- * Create a new episode record in Supabase with YouTube metadata
+ * Create a new episode record in Supabase with podcast metadata
  */
 export async function createEpisode(episodeData: CreateEpisodeData): Promise<string> {
   const insertData: any = {
-    youtube_url: episodeData.youtubeUrl,
     title: episodeData.title,
     description: episodeData.description,
     duration_seconds: episodeData.durationSeconds,
     thumbnail_url: episodeData.thumbnailUrl,
     channel_title: episodeData.channelTitle,
+    audio_url: episodeData.audioUrl,
     processing_status: 'pending',
     created_at: new Date().toISOString(),
   };
+
+  // Add optional fields if provided
+  if (episodeData.youtubeUrl) {
+    insertData.youtube_url = episodeData.youtubeUrl;
+  }
+  
+  if (episodeData.publishedAt) {
+    insertData.published_at = episodeData.publishedAt;
+  }
 
   // If ID is provided, use it instead of auto-generated
   if (episodeData.id) {
@@ -97,27 +129,48 @@ export async function createEpisode(episodeData: CreateEpisodeData): Promise<str
  * Get episode data by ID
  */
 export async function getEpisode(episodeId: string): Promise<EpisodeData> {
-  const { data, error } = await supabase
-    .from('episodes')
-    .select('*')
-    .eq('id', episodeId)
-    .single();
+  console.log('🔍 getEpisode: Starting query for episode ID:', episodeId);
+  
+  try {
+    console.log('🔍 getEpisode: Making Supabase query...');
+    const { data, error } = await supabase
+      .from('episodes')
+      .select('*')
+      .eq('id', episodeId)
+      .single();
 
-  if (error) throw error;
+    console.log('🔍 getEpisode: Query completed. Error:', error ? 'YES' : 'NO');
+    console.log('🔍 getEpisode: Data received:', data ? 'YES' : 'NO');
 
-  return {
-    id: data.id,
-    title: data.title || 'Loading...',
-    description: data.description,
-    youtubeUrl: data.youtube_url,
-    audioUrl: data.audio_url || '',
-    durationSeconds: data.duration_seconds,
-    thumbnailUrl: data.thumbnail_url,
-    channelTitle: data.channel_title,
-    processingStatus: data.processing_status,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
+    if (error) {
+      console.error('❌ getEpisode: Supabase error:', error);
+      throw error;
+    }
+
+    if (!data) {
+      console.error('❌ getEpisode: No data returned');
+      throw new Error('Episode not found');
+    }
+
+    console.log('✅ getEpisode: Successfully found episode:', data.title);
+
+    return {
+      id: data.id,
+      title: data.title || 'Loading...',
+      description: data.description,
+      youtubeUrl: data.youtube_url,
+      audioUrl: data.audio_url || '',
+      durationSeconds: data.duration_seconds,
+      thumbnailUrl: data.thumbnail_url,
+      channelTitle: data.channel_title,
+      processingStatus: data.processing_status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (error) {
+    console.error('❌ getEpisode: Catch block error:', error);
+    throw error;
+  }
 }
 
 /**
@@ -185,7 +238,8 @@ export async function searchSegments(
     id: segment.id,
     episodeId: episodeId,
     content: segment.content,
-    speaker: segment.speaker,
+    speaker: segment.speaker_name || 'Unknown', // Map speaker_name to speaker for compatibility
+    speakerName: segment.speaker_name,
     startTime: segment.start_time,
     endTime: segment.end_time,
     embedding: undefined, // Not returned in search results

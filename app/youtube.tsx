@@ -52,23 +52,36 @@ export default function YouTubePage() {
   const [activeTab, setActiveTab] = useState('favorites');
 
   const handleSubmit = async () => {
+    console.log('🚀 FRONTEND: handleSubmit called with URL:', podcastLink);
+    
     if (!podcastLink.trim()) {
       Alert.alert('Error', 'Please enter a YouTube URL');
       return;
     }
 
     try {
+      console.log('🔄 FRONTEND: Starting processing...');
       setIsLoading(true);
+      
+      console.log('📞 FRONTEND: Calling processPodcastLink...');
       // Process the YouTube URL and get video metadata + episode ID
       const result: ProcessResult = await processPodcastLink(podcastLink);
       
+      console.log('✅ FRONTEND: Processing successful, result:', result);
+      
       // Navigate to the episode conversation
+      console.log('🧭 FRONTEND: Navigating to episode:', result.episodeId);
       router.push(`/${result.episodeId}`);
       
     } catch (error) {
-      Alert.alert('Error', 'Failed to process YouTube URL. Please try again.');
-      console.error('Error processing podcast:', error);
+      console.error('❌ FRONTEND: Error caught in handleSubmit:', error);
+      console.error('❌ FRONTEND: Error type:', typeof error);
+      console.error('❌ FRONTEND: Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('❌ FRONTEND: Full error object:', JSON.stringify(error, null, 2));
+      
+      Alert.alert('Error', `Failed to process YouTube URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
+      console.log('🏁 FRONTEND: Setting loading to false');
       setIsLoading(false);
     }
   };

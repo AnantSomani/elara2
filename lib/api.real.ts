@@ -4,7 +4,7 @@ import { generateEmbedding, generateHostResponse } from './openai';
 import { rewriteQuestion } from './claude';
 import { synthesizeSpeech, getHostVoiceId, getHostVoiceSettings } from './vogent';
 import { getHostPrompt } from '../constants/prompts';
-import { processYouTubeUrl, type YouTubeVideoData } from './youtube';
+import { transcribeEpisode, checkTranscriptionStatus, searchTranscript, type TranscriptSegment } from './assemblyai';
 
 // Get environment variables for debugging
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -19,266 +19,297 @@ export interface QuestionResponse {
   answer: string;
   audioUrl: string;
   hostVoice: string;
+  relevantSegments?: TranscriptSegment[];
 }
 
-export interface ProcessResult {
+export interface EpisodeProcessResult {
   episodeId: string;
-  videoData: YouTubeVideoData;
+  transcriptionStarted: boolean;
+  transcriptionId?: string;
 }
 
 /**
- * Extract YouTube video ID from URL
- * Supports: youtube.com/watch?v=ID, youtube.com/shorts/ID, youtu.be/ID
+ * Process a podcast episode for transcription and AI chat
+ * This creates or updates episode data and starts transcription if needed
  */
-function extractVideoIdFromUrl(url: string): string | null {
-  // Regular YouTube URL: youtube.com/watch?v=VIDEO_ID
-  let match = url.match(/[?&]v=([^&#]*)/);
-  if (match) return match[1];
-  
-  // YouTube Shorts: youtube.com/shorts/VIDEO_ID
-  match = url.match(/\/shorts\/([^/?&#]*)/);
-  if (match) return match[1];
-  
-  // Short URL: youtu.be/VIDEO_ID
-  match = url.match(/youtu\.be\/([^/?&#]*)/);
-  if (match) return match[1];
-  
-  return null;
-}
-
-/**
- * Process a YouTube URL using video ID as episode identifier
- * This function returns immediately after creating the episode and getting metadata
- */
-export async function processPodcastLink(youtubeUrl: string): Promise<ProcessResult> {
+export async function processPodcastEpisode(
+  episodeData: any, 
+  audioUrl: string, 
+  podcastTitle: string
+): Promise<EpisodeProcessResult> {
   try {
-    console.log('🔄 Processing YouTube URL:', youtubeUrl);
+    console.log('🎙️ Processing podcast episode for transcription...');
+    console.log('📹 Episode:', episodeData.title);
+    console.log('🔗 Audio URL:', audioUrl);
     
-    // Extract video ID to use as episode ID
-    const videoId = extractVideoIdFromUrl(youtubeUrl);
-    if (!videoId) {
-      throw new Error('Could not extract video ID from YouTube URL');
-    }
+    const episodeId = episodeData.id.toString();
 
-    console.log('📹 Extracted video ID:', videoId);
+    // Check if episode exists in database
+    console.log('🔍 Checking database for existing episode...');
+    const { data: existingEpisode, error: dbError } = await supabase
+      .from('episodes')
+      .select('*')
+      .eq('id', episodeId)
+      .single();
 
-    // Check if episode already exists
-    try {
-      const existingEpisode = await getEpisode(videoId);
-      if (existingEpisode) {
-        console.log('✅ Episode already exists:', existingEpisode.title);
-        
-        // Convert existing episode data to YouTube format
-        const videoData: YouTubeVideoData = {
-          id: videoId,
-          title: existingEpisode.title,
-          description: existingEpisode.description || '',
-          duration: formatSecondsToISO(existingEpisode.durationSeconds || 0),
-          durationSeconds: existingEpisode.durationSeconds || 0,
-          thumbnailUrl: existingEpisode.thumbnailUrl || '',
-          channelTitle: existingEpisode.channelTitle || '',
-          publishedAt: existingEpisode.createdAt || new Date().toISOString(),
-        };
-        
-        return {
-          episodeId: videoId,
-          videoData,
-        };
+    let needsTranscription = true;
+
+    if (!dbError && existingEpisode) {
+      console.log('✅ Episode found in database');
+      
+      // Check transcription status
+      if (existingEpisode.transcriptionStatus === 'completed') {
+        console.log('✅ Episode already has completed transcription');
+        needsTranscription = false;
+      } else if (existingEpisode.transcriptionStatus === 'processing') {
+        console.log('⏳ Episode transcription already in progress');
+        needsTranscription = false;
       }
-    } catch (error) {
-      console.log('🆕 Episode doesn\'t exist yet, creating new one');
+    } else {
+      // Create new episode in database
+      console.log('🆕 Creating new episode in database...');
+      
+      const newEpisodeData: CreateEpisodeData = {
+        id: episodeId,
+        title: episodeData.title || 'Unknown Episode',
+        description: episodeData.description || '',
+        durationSeconds: episodeData.duration || 0,
+        thumbnailUrl: episodeData.image || '',
+        channelTitle: podcastTitle,
+        audioUrl: audioUrl,
+        publishedAt: new Date(episodeData.datePublished * 1000).toISOString(),
+      };
+      
+      await createEpisode(newEpisodeData);
+      console.log('✅ Episode created in database');
     }
 
-    // Fetch YouTube metadata
-    console.log('🔍 Fetching YouTube metadata...');
-    const videoData = await processYouTubeUrl(youtubeUrl);
-    console.log('✅ YouTube metadata fetched:', videoData.title);
-    
-    // Create episode with video ID
-    const episodeData: CreateEpisodeData = {
-      id: videoId,
-      youtubeUrl: youtubeUrl,
-      title: videoData.title,
-      description: videoData.description,
-      durationSeconds: videoData.durationSeconds,
-      thumbnailUrl: videoData.thumbnailUrl,
-      channelTitle: videoData.channelTitle,
-    };
-    
-    console.log('💾 Creating episode in database...');
-    const createdEpisodeId = await createEpisode(episodeData);
-    console.log('✅ Episode created with ID:', createdEpisodeId);
-    
-    // Start background processing immediately (don't wait for it)
-    startBackgroundProcessing(youtubeUrl, videoId).catch(error => {
-      console.error('❌ Background processing failed:', error);
-    });
-    
+    let transcriptionId: string | undefined;
+
+    // Start transcription if needed
+    if (needsTranscription && audioUrl) {
+      try {
+        console.log('🎤 Starting transcription process...');
+        transcriptionId = await transcribeEpisode(audioUrl, episodeId);
+        console.log('✅ Transcription started with ID:', transcriptionId);
+        
+        // Start monitoring transcription progress
+        monitorTranscriptionProgress(episodeId, transcriptionId).catch(error => {
+          console.error('❌ Transcription monitoring failed:', error);
+        });
+        
+      } catch (error) {
+        console.error('❌ Failed to start transcription:', error);
+        // Don't throw - episode can still be used without transcription
+      }
+    }
+
     return {
-      episodeId: videoId,
-      videoData,
+      episodeId,
+      transcriptionStarted: needsTranscription,
+      transcriptionId,
     };
+
   } catch (error) {
-    console.error('❌ Error processing YouTube URL:', error);
+    console.error('❌ Error processing podcast episode:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`Failed to process YouTube URL: ${errorMessage}`);
+    throw new Error(`Failed to process podcast episode: ${errorMessage}`);
   }
 }
 
 /**
- * Start background processing for audio download and AssemblyAI transcription
- * This calls the real Python processing API to download audio and transcribe
+ * Monitor transcription progress in the background
  */
-export async function startBackgroundProcessing(youtubeUrl: string, episodeId: string): Promise<void> {
+async function monitorTranscriptionProgress(episodeId: string, transcriptId: string): Promise<void> {
   try {
-    console.log('🔄 Starting background processing for episode:', episodeId);
+    console.log('👀 Monitoring transcription progress for:', episodeId);
     
-    // Update status to processing
-    await supabase
-      .from('episodes')
-      .update({ processing_status: 'processing' })
-      .eq('id', episodeId);
-    
-    // Call the Python processing API
-    const apiUrl = process.env.EXPO_PUBLIC_PROCESSING_API_URL || 'http://localhost:8000';
-    
-    console.log('🐍 Calling Python processing API at:', apiUrl);
-    
-    const response = await fetch(`${apiUrl}/process`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        youtube_url: youtubeUrl,
-        episode_id: episodeId,
-        force_reprocess: false,
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(`Python API error: ${errorData.detail || response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('✅ Python processing API response:', result);
-    
-    if (result.status === 'already_processed') {
-      console.log('ℹ️  Episode was already processed');
-      return;
-    }
-    
-    console.log('🎯 Real processing started! The Python API will:');
-    console.log('  1. Download actual audio from YouTube');
-    console.log('  2. Transcribe with AssemblyAI speaker diarization');
-    console.log('  3. Generate embeddings with OpenAI');
-    console.log('  4. Update database when complete');
-    console.log('');
-    console.log('📊 You can check the processing status in real-time in your database!');
+    const maxAttempts = 30; // 15 minutes max (30 * 30 seconds)
+    let attempts = 0;
+
+    const checkProgress = async (): Promise<void> => {
+      try {
+        attempts++;
+        console.log(`📊 Checking transcription progress (attempt ${attempts}/${maxAttempts})...`);
+        
+        const { assemblyAIService } = await import('./assemblyai');
+        const status = await assemblyAIService.checkTranscriptionStatus(transcriptId);
+        
+        console.log(`📈 Transcription status: ${status.status}`);
+        
+        if (status.status === 'completed') {
+          console.log('🎉 Transcription completed! Processing final result...');
+          await assemblyAIService.processCompletedTranscription(episodeId, transcriptId);
+          console.log('✅ Transcription processing complete');
+          return;
+        }
+        
+        if (status.status === 'error') {
+          console.error('❌ Transcription failed:', status.error);
+          return;
+        }
+        
+        if (attempts < maxAttempts && status.status === 'processing') {
+          // Continue monitoring
+          setTimeout(checkProgress, 30000); // Check every 30 seconds
+        } else if (attempts >= maxAttempts) {
+          console.warn('⚠️ Transcription monitoring timeout - stopping checks');
+        }
+        
+      } catch (error) {
+        console.error('❌ Error checking transcription progress:', error);
+        if (attempts < maxAttempts) {
+          setTimeout(checkProgress, 30000); // Retry in 30 seconds
+        }
+      }
+    };
+
+    // Start monitoring after initial delay
+    setTimeout(checkProgress, 10000); // Wait 10 seconds before first check
     
   } catch (error) {
-    console.error('❌ Background processing failed:', error);
-    
-    // Update status to failed
-    await supabase
-      .from('episodes')
-      .update({ 
-        processing_status: 'failed',
-        processing_metadata: { 
-          error: error instanceof Error ? error.message : 'Unknown error',
-          failed_at: new Date().toISOString()
-        }
-      })
-      .eq('id', episodeId);
+    console.error('❌ Error setting up transcription monitoring:', error);
   }
 }
 
 /**
- * Get episode data by ID
+ * Get episode data with transcription status
  */
 export async function getEpisodeData(episodeId: string): Promise<EpisodeData> {
   try {
-    return await getEpisode(episodeId);
+    console.log('📖 Getting episode data for:', episodeId);
+    
+    const episode = await getEpisode(episodeId);
+    if (!episode) {
+      throw new Error('Episode not found');
+    }
+    
+    // Check transcription status if it's still processing
+    if (episode.transcriptionStatus === 'processing' && episode.transcriptId) {
+      try {
+        const status = await checkTranscriptionStatus(episodeId);
+        if (status && status.status !== episode.transcriptionStatus) {
+          console.log(`📊 Transcription status updated: ${status.status}`);
+          // Status will be updated by the monitoring process
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not check transcription status:', error);
+      }
+    }
+    
+    return episode;
+    
   } catch (error) {
-    console.error('Error fetching episode data:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`Failed to fetch episode data: ${errorMessage}`);
+    console.error('❌ Error getting episode data:', error);
+    throw error;
   }
 }
 
 /**
- * Send a question about an episode and get AI response
+ * Send a question about an episode and get AI response with transcript context
  */
 export async function sendQuestion(
   episodeId: string, 
   question: string
 ): Promise<QuestionResponse> {
   try {
-    // Step 1: Get episode context
-    const episodeData = await getEpisode(episodeId);
-    
-    // Step 2: Get episode speakers to determine primary host
-    const speakers = await getEpisodeSpeakers(episodeId);
-    const primaryHost = speakers.find(s => s.speakerName)?.speakerName || 'Chamath'; // Default to Chamath if no mapping
-    
-    // Step 3: Rewrite question with Claude for better RAG performance
-    const rewrittenQuestion = await rewriteQuestion(
-      question, 
-      episodeData.title, 
-      [primaryHost] // Convert to array for compatibility
-    );
-    
-    // Step 4: Generate embedding for semantic search
-    const queryEmbedding = await generateEmbedding(rewrittenQuestion);
-    
-    // Step 5: Search for relevant segments
-    const relevantSegments = await searchSegments(episodeId, queryEmbedding);
-    
-    if (relevantSegments.length === 0) {
-      throw new Error('No relevant context found for your question');
+    console.log('💬 Processing question for episode:', episodeId);
+    console.log('❓ Question:', question);
+
+    // Get episode data
+    const episode = await getEpisode(episodeId);
+    if (!episode) {
+      throw new Error('Episode not found');
     }
+
+    // Check if transcription is available
+    let relevantSegments: TranscriptSegment[] = [];
+    let contextText = '';
     
-    // Step 6: Prepare context and generate response
-    const context = relevantSegments.map(seg => seg.content).join('\n\n');
-    const hostPrompt = await getHostPrompt(primaryHost); // Now async
+    if (episode.transcriptionStatus === 'completed') {
+      try {
+        console.log('🔍 Searching transcript for relevant content...');
+        relevantSegments = await searchTranscript(episodeId, question);
+        
+        if (relevantSegments.length > 0) {
+          console.log(`✅ Found ${relevantSegments.length} relevant transcript segments`);
+          contextText = relevantSegments
+            .map(segment => segment.text)
+            .join(' ');
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not search transcript:', error);
+      }
+    }
+
+    // Generate AI response with transcript context
+    console.log('🤖 Generating AI response...');
     
-    const answer = await generateHostResponse(
-      rewrittenQuestion,
-      context,
-      hostPrompt.name,
-      hostPrompt.systemPrompt
-    );
+    const questionText = question;
+    const episodeContext = contextText || `Episode: ${episode.title}`;
+    const hostName = 'Host';
+    const hostStyle = 'You are a knowledgeable podcast host. Provide helpful, accurate responses based on the episode content.';
+
+    const response = await generateHostResponse(questionText, episodeContext, hostName, hostStyle);
     
-    // Step 7: Convert to speech
-    const voiceId = await getHostVoiceId(primaryHost);
-    const voiceSettings = getHostVoiceSettings(primaryHost);
-    const audioUrl = await synthesizeSpeech(answer, voiceId, voiceSettings);
+    console.log('✅ AI response generated');
     
+    // For now, return without audio synthesis to focus on text responses
     return {
-      answer,
-      audioUrl,
-      hostVoice: primaryHost,
+      answer: response,
+      audioUrl: '', // Will implement audio synthesis later
+      hostVoice: 'Host',
+      relevantSegments: relevantSegments.length > 0 ? relevantSegments : undefined,
     };
+
   } catch (error) {
-    console.error('Error processing question:', error);
+    console.error('❌ Error processing question:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw new Error(`Failed to process question: ${errorMessage}`);
   }
 }
 
-// Re-export types for convenience
-export type { EpisodeData } from './supabase'; 
+/**
+ * Get transcription status for an episode
+ */
+export async function getTranscriptionStatus(episodeId: string): Promise<string> {
+  try {
+    const { data: episode, error } = await supabase
+      .from('episodes')
+      .select('transcription_status')
+      .eq('id', episodeId)
+      .single();
 
-// Helper function to convert seconds to ISO 8601 duration format
-function formatSecondsToISO(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  
-  if (hours > 0) {
-    return `PT${hours}H${minutes}M${secs}S`;
-  } else {
-    return `PT${minutes}M${secs}S`;
+    if (error || !episode) {
+      return 'not_started';
+    }
+
+    return episode.transcription_status || 'not_started';
+    
+  } catch (error) {
+    console.error('❌ Error getting transcription status:', error);
+    return 'error';
+  }
+}
+
+/**
+ * Manually trigger transcription for an episode
+ */
+export async function startTranscription(episodeId: string, audioUrl: string): Promise<string> {
+  try {
+    console.log('🎤 Manually starting transcription for episode:', episodeId);
+    
+    const transcriptionId = await transcribeEpisode(audioUrl, episodeId);
+    
+    // Start monitoring
+    monitorTranscriptionProgress(episodeId, transcriptionId).catch(error => {
+      console.error('❌ Transcription monitoring failed:', error);
+    });
+    
+    return transcriptionId;
+    
+  } catch (error) {
+    console.error('❌ Error starting transcription:', error);
+    throw error;
   }
 } 
