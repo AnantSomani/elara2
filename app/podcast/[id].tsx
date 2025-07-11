@@ -59,9 +59,8 @@ export default function PodcastDetailPage() {
   const handleEpisodeSelect = (episode: PodcastEpisode) => {
     // Navigate to episode player with episode data
     router.push({
-      pathname: '/[episode]',
+      pathname: `/episode/${episode.id}`,
       params: {
-        episodeId: episode.id.toString(),
         podcastId: id,
         podcastTitle: podcast?.title || '',
         episodeTitle: episode.title,
@@ -196,48 +195,29 @@ export default function PodcastDetailPage() {
               <Text style={styles.emptyText}>No episodes available</Text>
             </LiquidGlassButton>
           ) : (
-            episodes.map((episode, index) => (
-                             <LiquidGlassButton 
-                 key={episode.id} 
-                 borderRadius={24} 
-                 intensity="medium" 
-                 style={
-                   index === episodes.length - 1 
-                     ? [styles.episodeCard, styles.lastEpisodeCard]
-                     : styles.episodeCard
-                 }
-               >
-                <TouchableOpacity 
-                  onPress={() => handleEpisodeSelect(episode)}
-                  style={styles.episodeButton}
+            episodes.slice(0, 3).map((episode, index) => (
+              <TouchableOpacity key={episode.id} onPress={() => handleEpisodeSelect(episode)} activeOpacity={0.8}>
+                <LiquidGlassButton
+                  borderRadius={24}
+                  intensity="medium"
+                  style={styles.episodeCard}
                 >
-                  <View style={styles.episodeContent}>
-                    <View style={styles.episodeHeader}>
-                      <Text style={styles.episodeTitle} numberOfLines={2}>
-                        {episode.title}
-                      </Text>
-                      <Text style={styles.episodeDate}>
-                        {formatDate(episode.datePublished)}
-                      </Text>
-                    </View>
-                    
-                    {episode.description && (
-                      <Text style={styles.episodeDescription} numberOfLines={2}>
-                        {episode.description.replace(/<[^>]*>/g, '').trim()}
-                      </Text>
-                    )}
-                    
-                    <View style={styles.episodeFooter}>
-                      {episode.duration > 0 && (
-                        <Text style={styles.episodeDuration}>
-                          {formatDuration(episode.duration)}
+                  <View style={styles.episodeRow}>
+                    <View style={styles.episodeInfo}>
+                      <Text style={styles.episodeTitle} numberOfLines={2}>{episode.title}</Text>
+                      <Text style={styles.episodeDate}>{formatDate(episode.datePublished)}</Text>
+                      {episode.description && (
+                        <Text style={styles.episodeDescription} numberOfLines={2}>
+                          {episode.description.replace(/<[^>]*>/g, '').trim()}
                         </Text>
                       )}
-                      <Text style={styles.playHint}>Tap to play →</Text>
+                    </View>
+                    <View style={styles.episodeAction}>
+                      <Text style={styles.episodePlayIcon}>▶</Text>
                     </View>
                   </View>
-                </TouchableOpacity>
-              </LiquidGlassButton>
+                </LiquidGlassButton>
+              </TouchableOpacity>
             ))
           )}
         </View>
@@ -318,8 +298,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   podcastCard: {
-    marginBottom: 32,
-    padding: 20,
+    marginBottom: 48, // Increased margin to push episodes further down
+    padding: 28, // Increased padding for more space around podcast info
   },
   podcastInfo: {
     flexDirection: 'row',
@@ -372,7 +352,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   episodeCard: {
-    marginBottom: 12,
+    marginBottom: 32,
+    paddingVertical: 20,
+    paddingHorizontal: 0,
+    minHeight: 110,
+    justifyContent: 'center',
   },
   lastEpisodeCard: {
     marginBottom: 0,
@@ -390,22 +374,20 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   episodeTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.95)',
-    lineHeight: 22,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 6,
   },
   episodeDate: {
     fontSize: 14,
-    color: 'rgba(174, 239, 255, 0.7)',
-    minWidth: 80,
-    textAlign: 'right',
+    color: '#aeefff',
+    marginBottom: 6,
   },
   episodeDescription: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    lineHeight: 20,
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 2,
   },
   episodeFooter: {
     flexDirection: 'row',
@@ -429,5 +411,26 @@ const styles = StyleSheet.create({
   emptyText: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 16,
+  },
+  episodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  episodeInfo: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingRight: 12,
+  },
+  episodePlayIcon: {
+    fontSize: 32,
+    color: '#aeefff',
+  },
+  episodeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
   },
 }); 

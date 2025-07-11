@@ -22,6 +22,7 @@ export default function SearchResultsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (q) {
@@ -137,53 +138,57 @@ export default function SearchResultsPage() {
                 <Text style={styles.errorHint}>Try different keywords or check spelling</Text>
               </LiquidGlassButton>
             ) : (
-              results.map((podcast) => (
-                <LiquidGlassButton 
-                  key={podcast.id} 
-                  borderRadius={24} 
-                  intensity="medium" 
-                  style={styles.podcastCard}
-                >
-                  <TouchableOpacity 
+              results.slice(0, 3).map((podcast, idx) => {
+                const isExpanded = expandedIndex === idx;
+                return (
+                  <TouchableOpacity
+                    key={podcast.id}
+                    activeOpacity={0.85}
+                    style={styles.podcastCard}
                     onPress={() => handlePodcastSelect(podcast)}
-                    style={styles.podcastButton}
                   >
-                    <View style={styles.podcastContent}>
-                      <View style={styles.podcastHeader}>
-                        {podcast.imageUrl ? (
-                          <Image 
-                            source={{ uri: podcast.imageUrl }} 
-                            style={styles.podcastImage}
-                            defaultSource={require('../../assets/icon.png')}
-                          />
-                        ) : (
-                          <View style={styles.podcastImagePlaceholder}>
-                            <Text style={styles.podcastImageText}>🎙️</Text>
-                          </View>
-                        )}
-                        
-                        <View style={styles.podcastMeta}>
-                          <Text style={styles.podcastTitle} numberOfLines={2}>
-                            {podcast.title}
-                          </Text>
-                          <Text style={styles.podcastAuthor}>
-                            by {podcast.author}
-                          </Text>
-                          {podcast.description && (
-                            <Text style={styles.podcastDescription} numberOfLines={2}>
-                              {podcast.description}
-                            </Text>
+                    <LiquidGlassButton
+                      borderRadius={20}
+                      intensity="medium"
+                      style={{ flex: 1 }}
+                    >
+                      <View style={styles.podcastRow}>
+                        {/* Artwork */}
+                        <View style={styles.podcastImageContainer}>
+                          {podcast.imageUrl ? (
+                            <Image
+                              source={{ uri: podcast.imageUrl }}
+                              style={styles.podcastImage}
+                              defaultSource={require('../../assets/icon.png')}
+                            />
+                          ) : (
+                            <View style={styles.podcastImagePlaceholder}>
+                              <Text style={styles.podcastImageText}>🎙️</Text>
+                            </View>
+                          )}
+                        </View>
+                        {/* Info */}
+                        <View style={styles.podcastInfo}>
+                          <Text style={styles.podcastTitle} numberOfLines={1}>{podcast.title}</Text>
+                          <Text style={styles.podcastAuthor} numberOfLines={1}>{podcast.author}</Text>
+                          <TouchableOpacity
+                            style={styles.seeMoreButton}
+                            onPress={e => {
+                              e.stopPropagation();
+                              setExpandedIndex(isExpanded ? null : idx);
+                            }}
+                          >
+                            <Text style={styles.seeMoreText}>{isExpanded ? 'hide' : 'see more'}</Text>
+                          </TouchableOpacity>
+                          {isExpanded && podcast.description && (
+                            <Text style={styles.podcastDescription}>{podcast.description}</Text>
                           )}
                         </View>
                       </View>
-                      
-                      <View style={styles.podcastFooter}>
-                        <Text style={styles.selectHint}>Tap to view episodes →</Text>
-                      </View>
-                    </View>
+                    </LiquidGlassButton>
                   </TouchableOpacity>
-                </LiquidGlassButton>
-              ))
+                );
+              })
             )}
           </View>
         )}
@@ -272,11 +277,21 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(174, 239, 255, 0.3)',
   },
   searchButton: {
-    backgroundColor: 'rgba(174, 239, 255, 0.6)',
+    backgroundColor: 'rgba(174, 239, 255, 0.7)',
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(174, 239, 255, 0.4)',
+    elevation: 2,
+    shadowColor: 'rgba(174, 239, 255, 0.5)',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
   searchButtonText: {
     color: '#000000',
@@ -319,63 +334,71 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   podcastCard: {
-    marginBottom: 12,
+    marginBottom: 28, // more space between cards
+    minHeight: 100, // ensure tall enough for content
+    justifyContent: 'center',
   },
-  podcastButton: {
-    padding: 16,
-  },
-  podcastContent: {
-    gap: 16,
-  },
-  podcastHeader: {
+  podcastRow: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 16, // more vertical padding
+    paddingHorizontal: 8,
+  },
+  podcastImageContainer: {
+    marginRight: 20,
   },
   podcastImage: {
     width: 80,
     height: 80,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   podcastImagePlaceholder: {
     width: 80,
     height: 80,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   podcastImageText: {
     fontSize: 32,
   },
-  podcastMeta: {
+  podcastInfo: {
     flex: 1,
-    gap: 6,
+    justifyContent: 'center',
   },
   podcastTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.95)',
-    lineHeight: 24,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
   },
   podcastAuthor: {
     fontSize: 14,
-    color: 'rgba(174, 239, 255, 0.8)',
+    color: '#aeefff',
+    marginBottom: 4,
+  },
+  seeMoreButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(174,239,255,0.15)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 2,
+  },
+  seeMoreText: {
+    color: '#fff',
+    fontSize: 13,
     fontWeight: '500',
   },
   podcastDescription: {
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
-    lineHeight: 18,
+    marginTop: 4,
   },
-  podcastFooter: {
-    alignItems: 'flex-end',
-  },
-  selectHint: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontStyle: 'italic',
-  },
+
   welcomeCard: {
     padding: 32,
     alignItems: 'center',

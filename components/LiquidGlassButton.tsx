@@ -161,7 +161,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 4,
+    paddingVertical: 16, // Increased vertical padding
+    paddingHorizontal: 20, // Increased horizontal padding
   },
   iridescentBorder: {
     position: 'absolute',
