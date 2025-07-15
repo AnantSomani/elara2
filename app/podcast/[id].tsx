@@ -56,18 +56,29 @@ export default function PodcastDetailPage() {
     }
   };
 
-  const handleEpisodeSelect = (episode: PodcastEpisode) => {
-    // Navigate to episode player with episode data
-    router.push({
-      pathname: `/episode/${episode.id}`,
-      params: {
-        podcastId: id,
-        podcastTitle: podcast?.title || '',
-        episodeTitle: episode.title,
-        audioUrl: episode.enclosureUrl,
-        episodeData: JSON.stringify(episode),
-      },
-    });
+  const handleEpisodeSelect = async (episode: PodcastEpisode) => {
+    try {
+      // Fetch all episodes for this podcast
+      const allEpisodes = await getPodcastEpisodes(episode.feedId.toString(), 100);
+      // Find the episode by GUID or ID
+      const latestEpisode = allEpisodes.find(e => e.id === episode.id || e.guid === episode.guid);
+
+      if (!latestEpisode) {
+        Alert.alert('Error', 'Episode not found in Podcast Index');
+        return;
+      }
+
+      // Navigate to episode player with the latest episode data
+      router.push({
+        pathname: `/episode/${latestEpisode.id}`,
+        params: {
+          episodeData: JSON.stringify(latestEpisode),
+        },
+      });
+    } catch (err) {
+      Alert.alert('Error', 'Failed to fetch episode data');
+      console.error(err);
+    }
   };
 
   const handleBackPress = () => {

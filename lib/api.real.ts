@@ -74,9 +74,9 @@ export async function processPodcastEpisode(
         title: episodeData.title || 'Unknown Episode',
         description: episodeData.description || '',
         durationSeconds: episodeData.duration || 0,
-        thumbnailUrl: episodeData.image || '',
-        channelTitle: podcastTitle,
-        audioUrl: audioUrl,
+        imageUrl: episodeData.image || '',
+        podcastTitle: podcastTitle,
+        enclosureUrl: audioUrl,
         publishedAt: new Date(episodeData.datePublished * 1000).toISOString(),
       };
       

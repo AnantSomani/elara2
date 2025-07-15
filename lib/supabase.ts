@@ -11,17 +11,21 @@ console.log('🔧 Supabase Key configured:', supabaseKey ? `${supabaseKey.substr
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface EpisodeData {
-  id: string;                    // YouTube video ID or podcast episode ID
+  id: string;                    // Podcast Index episode GUID or unique ID
+  podcastId?: string;            // Podcast Index podcast ID
+  guid?: string;                 // Podcast Index episode GUID
   title: string;
   description?: string;
-  youtubeUrl?: string;           // Made optional for podcast episodes
-  audioUrl?: string;
+  enclosureUrl?: string;         // Audio file URL
+  imageUrl?: string;             // Episode or podcast artwork
+  publishedAt?: string;          // Original publish date
   durationSeconds?: number;
-  thumbnailUrl?: string;
-  channelTitle?: string;
+  feedUrl?: string;              // Podcast RSS feed URL
+  episodeType?: string;          // e.g., 'full', 'trailer', 'bonus'
+  explicit?: boolean;            // Explicit content flag
+  podcastTitle?: string;         // Podcast title (denormalized)
   processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
-  hosts?: string[];              // Array of host names
-  
+  hosts?: string[];
   // Transcription fields
   assemblyaiTranscriptId?: string;
   assemblyaiStatus?: 'pending' | 'processing' | 'completed' | 'failed';
@@ -31,9 +35,6 @@ export interface EpisodeData {
   episodeChapters?: any[];
   detectedEntities?: any[];
   processingMetadata?: any;
-  
-  // Timestamps
-  publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -72,15 +73,19 @@ export interface EpisodeSpeaker {
 }
 
 export interface CreateEpisodeData {
-  id?: string;                   // Optional YouTube video ID or podcast episode ID
+  id?: string;                   // Podcast Index episode GUID or unique ID
+  podcastId?: string;
+  guid?: string;
   title: string;
   description?: string;
-  youtubeUrl?: string;           // Made optional for podcast episodes
-  audioUrl?: string;
+  enclosureUrl?: string;
+  imageUrl?: string;
+  publishedAt?: string;
   durationSeconds?: number;
-  thumbnailUrl?: string;
-  channelTitle?: string;
-  publishedAt?: string;          // Podcast episode publish date
+  feedUrl?: string;
+  episodeType?: string;
+  explicit?: boolean;
+  podcastTitle?: string;
 }
 
 /**
@@ -91,18 +96,22 @@ export async function createEpisode(episodeData: CreateEpisodeData): Promise<str
     title: episodeData.title,
     description: episodeData.description,
     duration_seconds: episodeData.durationSeconds,
-    thumbnail_url: episodeData.thumbnailUrl,
-    channel_title: episodeData.channelTitle,
-    audio_url: episodeData.audioUrl,
+    thumbnail_url: episodeData.imageUrl,
+    channel_title: episodeData.podcastTitle,
+    audio_url: episodeData.enclosureUrl,
     processing_status: 'pending',
     created_at: new Date().toISOString(),
   };
 
   // Add optional fields if provided
-  if (episodeData.youtubeUrl) {
-    insertData.youtube_url = episodeData.youtubeUrl;
+  if (episodeData.guid) {
+    insertData.guid = episodeData.guid;
   }
   
+  if (episodeData.podcastId) {
+    insertData.podcast_id = episodeData.podcastId;
+  }
+
   if (episodeData.publishedAt) {
     insertData.published_at = episodeData.publishedAt;
   }
@@ -158,11 +167,14 @@ export async function getEpisode(episodeId: string): Promise<EpisodeData> {
       id: data.id,
       title: data.title || 'Loading...',
       description: data.description,
-      youtubeUrl: data.youtube_url,
-      audioUrl: data.audio_url || '',
+      enclosureUrl: data.audio_url,
+      imageUrl: data.thumbnail_url,
+      publishedAt: data.published_at,
       durationSeconds: data.duration_seconds,
-      thumbnailUrl: data.thumbnail_url,
-      channelTitle: data.channel_title,
+      feedUrl: data.feed_url,
+      episodeType: data.episode_type,
+      explicit: data.explicit,
+      podcastTitle: data.channel_title,
       processingStatus: data.processing_status,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
@@ -284,11 +296,14 @@ export function subscribeToEpisode(episodeId: string, callback: (episode: Episod
           id: data.id,
           title: data.title || 'Loading...',
           description: data.description,
-          youtubeUrl: data.youtube_url,
-          audioUrl: data.audio_url || '',
+          enclosureUrl: data.audio_url,
+          imageUrl: data.thumbnail_url,
+          publishedAt: data.published_at,
           durationSeconds: data.duration_seconds,
-          thumbnailUrl: data.thumbnail_url,
-          channelTitle: data.channel_title,
+          feedUrl: data.feed_url,
+          episodeType: data.episode_type,
+          explicit: data.explicit,
+          podcastTitle: data.channel_title,
           processingStatus: data.processing_status,
           createdAt: data.created_at,
           updatedAt: data.updated_at,

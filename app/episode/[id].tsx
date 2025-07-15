@@ -232,7 +232,7 @@ export default function EpisodePage() {
   // Load audio from real podcast CDN URL
   useEffect(() => {
     const loadEpisodeAudio = async () => {
-      if (!audioUrl) {
+      if (!currentEpisode?.enclosureUrl) {
         setEpisodeError('No audio URL provided');
         setIsLoadingEpisode(false);
         return;
@@ -242,8 +242,8 @@ export default function EpisodePage() {
         setIsLoadingEpisode(true);
         setEpisodeError(null);
         
-        console.log('🎵 Loading real podcast audio from CDN:', audioUrl);
-        await loadAudio(audioUrl);
+        console.log('🎵 Loading real podcast audio from CDN:', currentEpisode.enclosureUrl);
+        await loadAudio(currentEpisode.enclosureUrl);
         console.log('✅ Audio loaded successfully');
         
       } catch (error) {
@@ -255,7 +255,7 @@ export default function EpisodePage() {
     };
 
     loadEpisodeAudio();
-  }, [audioUrl, loadAudio]);
+  }, [currentEpisode?.enclosureUrl, loadAudio]);
 
   const handleBackPress = () => {
     router.back();
@@ -525,8 +525,8 @@ export default function EpisodePage() {
         <View style={styles.waveformSection}>
           <PlayableWaveform
             isPlaying={isPlaying}
-            isLoading={isLoading || !episode.audioUrl}
-            onTogglePlayback={episode.audioUrl ? togglePlayback : () => {}}
+            isLoading={isLoading || !currentEpisode.enclosureUrl}
+            onTogglePlayback={currentEpisode.enclosureUrl ? togglePlayback : () => {}}
             size={160}
             barCount={20}
             color="rgba(80,120,255,0.92)"
@@ -534,10 +534,10 @@ export default function EpisodePage() {
           {isLoading && (
             <Text style={styles.loadingText}>Loading audio...</Text>
           )}
-          {!episode.audioUrl && episode.processingStatus === 'processing' && (
+          {!currentEpisode.enclosureUrl && episode?.processingStatus === 'processing' && (
             <Text style={styles.loadingText}>Processing audio...</Text>
           )}
-          {!episode.audioUrl && episode.processingStatus === 'pending' && (
+          {!currentEpisode.enclosureUrl && episode?.processingStatus === 'pending' && (
             <Text style={styles.loadingText}>Preparing audio...</Text>
           )}
         </View>
@@ -547,9 +547,9 @@ export default function EpisodePage() {
           <View style={styles.episodeHeader}>
             <Text style={styles.episodeThumbnail}>{getEpisodeThumbnail()}</Text>
             <View style={styles.episodeInfo}>
-              <Text style={styles.episodeTitle}>{episode.title}</Text>
+              <Text style={styles.episodeTitle}>{currentEpisode.title}</Text>
               <Text style={styles.episodeChannel}>{getEpisodeChannel()}</Text>
-              <Text style={styles.episodeHosts}>with {(episode.hosts || []).join(', ') || 'Host'}</Text>
+              <Text style={styles.episodeHosts}>with {(currentEpisode.hosts || []).join(', ') || 'Host'}</Text>
               <Text style={styles.episodeDuration}>{getEpisodeDuration()}</Text>
             </View>
           </View>
@@ -573,20 +573,20 @@ export default function EpisodePage() {
         {/* Episode Dropdown */}
         <EpisodeDropdown 
           episode={{
-            id: episode.id,
-            title: episode.title,
+            id: currentEpisode.id,
+            title: currentEpisode.title,
             thumbnail: getEpisodeThumbnail(),
             channel: getEpisodeChannel(),
             duration: getEpisodeDuration(),
             progress: getEpisodeProgress(),
-            status: episode.processingStatus === 'completed' ? 'completed' : 'watching',
+            status: episode?.processingStatus === 'completed' ? 'completed' : 'watching',
             watchedDuration: getWatchedDuration(),
             lastWatched: '2 hours ago', // Mock for now
             conversationCount: messages.filter(m => m.type === 'question').length,
-            publishedDate: episode.createdAt ? new Date(episode.createdAt).toLocaleDateString() : 'Recent',
-            description: episode.description || 'No description available',
+            publishedDate: episode?.createdAt ? new Date(episode.createdAt).toLocaleDateString() : 'Recent',
+            description: episode?.description || 'No description available',
             tags: ['Podcast', 'Audio'], // Mock tags for now
-            hosts: episode.hosts || [],
+            hosts: currentEpisode.hosts || [],
           } as any}
           getTagColor={getTagColor}
         />
@@ -652,17 +652,17 @@ export default function EpisodePage() {
                <TextInput
                  ref={textInputRef}
                  style={styles.searchInput}
-                 placeholder={episode.processingStatus === 'completed' ? "Ask a question about this episode..." : "Processing episode... Chat will be available soon."}
+                 placeholder={episode?.processingStatus === 'completed' ? "Ask a question about this episode..." : "Processing episode... Chat will be available soon."}
                  placeholderTextColor="rgba(255, 255, 255, 0.6)"
                  value={newMessage}
                  onChangeText={setNewMessage}
-                 onFocus={episode.processingStatus === 'completed' ? expandBottomSheet : undefined}
+                 onFocus={episode?.processingStatus === 'completed' ? expandBottomSheet : undefined}
                  multiline={false}
                  returnKeyType="send"
-                 onSubmitEditing={episode.processingStatus === 'completed' ? handleSendMessage : undefined}
+                 onSubmitEditing={episode?.processingStatus === 'completed' ? handleSendMessage : undefined}
                  autoCorrect={false}
                  autoCapitalize="none"
-                 editable={episode.processingStatus === 'completed'}
+                 editable={episode?.processingStatus === 'completed'}
                />
                {newMessage.trim() && (
                  <TouchableOpacity 
