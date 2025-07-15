@@ -235,25 +235,23 @@ export default function EpisodePage() {
       if (!currentEpisode?.enclosureUrl) {
         setEpisodeError('No audio URL provided');
         setIsLoadingEpisode(false);
+        console.log('EPISODE: No audio URL provided');
         return;
       }
-
       try {
         setIsLoadingEpisode(true);
         setEpisodeError(null);
-        
-        console.log('🎵 Loading real podcast audio from CDN:', currentEpisode.enclosureUrl);
+        console.log('EPISODE: Calling loadAudio for', currentEpisode.enclosureUrl);
         await loadAudio(currentEpisode.enclosureUrl);
-        console.log('✅ Audio loaded successfully');
-        
+        console.log('EPISODE: loadAudio finished successfully');
       } catch (error) {
-        console.error('❌ Error loading episode audio:', error);
+        console.error('EPISODE: Error loading episode audio', error);
         setEpisodeError('Failed to load episode audio');
       } finally {
         setIsLoadingEpisode(false);
+        console.log('EPISODE: Finished loadEpisodeAudio');
       }
     };
-
     loadEpisodeAudio();
   }, [currentEpisode?.enclosureUrl, loadAudio]);
 

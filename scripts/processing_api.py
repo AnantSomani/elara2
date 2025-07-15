@@ -80,6 +80,30 @@ class BatchProcessResponse(BaseModel):
     message: str
     batch_id: str
 
+# New Podcast Index models
+class PodcastIndexEpisodeData(BaseModel):
+    guid: str
+    enclosureUrl: str
+    title: str
+    description: Optional[str] = None
+    duration: Optional[int] = None
+    pubDate: Optional[str] = None
+    imageUrl: Optional[str] = None
+    podcastTitle: Optional[str] = None
+    episodeType: Optional[str] = None
+    explicit: Optional[bool] = None
+
+class PodcastIndexProcessRequest(BaseModel):
+    episode_data: PodcastIndexEpisodeData
+    episode_id: Optional[str] = None
+    force_reprocess: bool = False
+
+class PodcastIndexProcessResponse(BaseModel):
+    episode_id: str
+    status: str
+    message: str
+    started_at: str
+
 # Global processor instance
 processor = None
 
@@ -136,6 +160,52 @@ async def process_episode_background(youtube_url: str, episode_id: str = None, f
             pass  # Don't fail on status update error
         raise
 
+# Background task for Podcast Index processing
+async def process_podcast_index_background(episode_data: PodcastIndexEpisodeData, episode_id: str = None, force_reprocess: bool = False):
+    """Background task to process Podcast Index episode"""
+    try:
+        proc = get_processor()
+        
+        if not force_reprocess:
+            # Check if already processed using guid
+            existing_id = await proc.check_if_already_processed_podcast_index(episode_data.guid)
+            if existing_id:
+                logger.info(f"Podcast Index episode already processed: {existing_id}")
+                return existing_id
+        
+        # Ensure episode exists in database
+        if episode_id:
+            # Check if episode with this ID exists
+            result = proc.supabase.table('episodes').select('id').eq('id', episode_id).execute()
+            if not result.data:
+                # Episode doesn't exist, create it
+                logger.info(f"Creating Podcast Index episode with provided ID: {episode_id}")
+                episode_id = await proc.create_episode_from_podcast_index(episode_data)
+            else:
+                logger.info(f"Podcast Index episode already exists: {episode_id}")
+        else:
+            # Create new episode
+            episode_id = await proc.create_episode_from_podcast_index(episode_data)
+        
+        # Process the episode
+        result_id = await proc.process_podcast_index_episode(episode_data, episode_id)
+        logger.info(f"Successfully processed Podcast Index episode: {result_id}")
+        return result_id
+        
+    except Exception as e:
+        logger.error(f"Podcast Index background processing failed: {e}")
+        # Update episode status to failed if possible
+        try:
+            proc = get_processor()
+            if episode_id:
+                proc.supabase.table('episodes').update({
+                    'processing_status': 'failed',
+                    'processing_metadata': {'error': str(e), 'failed_at': datetime.now().isoformat()}
+                }).eq('id', episode_id).execute()
+        except:
+            pass  # Don't fail on status update error
+        raise
+
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
@@ -143,7 +213,8 @@ async def root():
         "message": "Podcast Processing API",
         "version": "1.0.0",
         "endpoints": {
-            "process": "/process - Process a single episode",
+            "process": "/process - Process a single YouTube episode",
+            "process-podcast-index": "/process-podcast-index - Process a Podcast Index episode",
             "status": "/status/{episode_id} - Get processing status",
             "batch": "/batch - Process multiple episodes",
             "health": "/health - Health check"
@@ -210,6 +281,50 @@ async def process_episode(request: ProcessRequest, background_tasks: BackgroundT
         
     except Exception as e:
         logger.error(f"Process endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/process-podcast-index", response_model=PodcastIndexProcessResponse)
+async def process_podcast_index_episode(request: PodcastIndexProcessRequest, background_tasks: BackgroundTasks):
+    """Process a Podcast Index episode"""
+    try:
+        episode_data = request.episode_data
+        logger.info(f"Received Podcast Index processing request for: {episode_data.title} (GUID: {episode_data.guid})")
+        
+        proc = get_processor()
+        
+        # Check if already processed (unless force reprocess)
+        if not request.force_reprocess:
+            existing_id = await proc.check_if_already_processed_podcast_index(episode_data.guid)
+            if existing_id:
+                return PodcastIndexProcessResponse(
+                    episode_id=existing_id,
+                    status="already_processed",
+                    message="Podcast Index episode already processed",
+                    started_at=datetime.now().isoformat()
+                )
+        
+        # Create episode record if needed
+        episode_id = request.episode_id
+        if not episode_id:
+            episode_id = await proc.create_episode_from_podcast_index(episode_data)
+        
+        # Start background processing
+        background_tasks.add_task(
+            process_podcast_index_background, 
+            episode_data, 
+            episode_id, 
+            request.force_reprocess
+        )
+        
+        return PodcastIndexProcessResponse(
+            episode_id=episode_id,
+            status="processing",
+            message="Podcast Index episode processing started",
+            started_at=datetime.now().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"Podcast Index process endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/status/{episode_id}", response_model=StatusResponse)

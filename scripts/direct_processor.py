@@ -95,6 +95,37 @@ class DirectPodcastProcessor(AssemblyAIPodcastProcessor):
             logger.warning(f"Error checking database: {e}")
         
         return None
+
+    async def check_if_already_processed_podcast_index(self, guid: str) -> Optional[str]:
+        """Check if Podcast Index episode is already processed"""
+        # Check local cache first
+        if guid in self.processed_episodes:
+            episode_id = self.processed_episodes[guid]['episode_id']
+            logger.info(f"Podcast Index episode already processed locally: {episode_id}")
+            return episode_id
+        
+        # Check database
+        try:
+            result = self.supabase.table('episodes')\
+                .select('id, processing_status')\
+                .eq('podcast_index_guid', guid)\
+                .eq('processing_status', 'completed')\
+                .execute()
+            
+            if result.data:
+                episode_id = result.data[0]['id']
+                logger.info(f"Podcast Index episode already processed in database: {episode_id}")
+                # Update local cache
+                self.processed_episodes[guid] = {
+                    'episode_id': episode_id,
+                    'processed_at': datetime.datetime.now().isoformat()
+                }
+                self.save_processed_episodes()
+                return episode_id
+        except Exception as e:
+            logger.warning(f"Error checking database: {e}")
+        
+        return None
     
     async def get_youtube_metadata(self, youtube_url: str) -> Dict:
         """Get YouTube metadata using yt-dlp (same as existing logic)"""
@@ -174,6 +205,49 @@ class DirectPodcastProcessor(AssemblyAIPodcastProcessor):
         except Exception as e:
             logger.error(f"Error creating episode: {e}")
             raise
+
+    async def create_episode_from_podcast_index(self, episode_data) -> str:
+        """Create episode record from Podcast Index data"""
+        try:
+            # Use guid as the episode ID
+            episode_id = episode_data.guid
+            
+            # Check if episode already exists
+            result = self.supabase.table('episodes')\
+                .select('id')\
+                .eq('id', episode_id)\
+                .execute()
+            
+            if result.data:
+                existing_id = result.data[0]['id']
+                logger.info(f"Podcast Index episode record already exists: {existing_id}")
+                return existing_id
+            
+            # Create episode record with Podcast Index data
+            episode_record = {
+                'id': episode_id,  # Use Podcast Index GUID as primary key
+                'podcast_index_guid': episode_data.guid,
+                'enclosure_url': episode_data.enclosureUrl,
+                'title': episode_data.title,
+                'description': episode_data.description or '',
+                'duration_seconds': episode_data.duration or 0,
+                'pub_date': episode_data.pubDate,
+                'image_url': episode_data.imageUrl,
+                'podcast_title': episode_data.podcastTitle,
+                'episode_type': 'podcast_index',
+                'explicit': episode_data.explicit or False,
+                'processing_status': 'pending'
+            }
+            
+            result = self.supabase.table('episodes').insert(episode_record).execute()
+            created_id = result.data[0]['id']
+            
+            logger.info(f"Created Podcast Index episode record: {created_id}")
+            return created_id
+            
+        except Exception as e:
+            logger.error(f"Error creating Podcast Index episode: {e}")
+            raise
     
     def extract_youtube_video_id(self, youtube_url: str) -> Optional[str]:
         """Extract YouTube video ID from URL"""
@@ -224,6 +298,38 @@ class DirectPodcastProcessor(AssemblyAIPodcastProcessor):
             
         except Exception as e:
             logger.error(f"❌ Error processing episode: {e}")
+            raise
+
+    async def process_podcast_index_episode(self, episode_data, episode_id: str = None) -> str:
+        """Process a Podcast Index episode directly"""
+        try:
+            logger.info(f"🎙️ Starting Podcast Index processing for: {episode_data.title}")
+            
+            # Check if already processed
+            existing_id = await self.check_if_already_processed_podcast_index(episode_data.guid)
+            if existing_id:
+                return existing_id
+            
+            # Create episode if needed
+            if not episode_id:
+                episode_id = await self.create_episode_from_podcast_index(episode_data)
+            
+            # Process using existing logic from parent class but with direct audio URL
+            logger.info(f"🚀 Processing Podcast Index episode {episode_id}...")
+            await self.process_podcast_index_audio(episode_data.enclosureUrl, episode_id)
+            
+            # Update local cache
+            self.processed_episodes[episode_data.guid] = {
+                'episode_id': episode_id,
+                'processed_at': datetime.datetime.now().isoformat()
+            }
+            self.save_processed_episodes()
+            
+            logger.info(f"✅ Successfully processed Podcast Index episode: {episode_id}")
+            return episode_id
+            
+        except Exception as e:
+            logger.error(f"❌ Error processing Podcast Index episode: {e}")
             raise
     
     async def batch_process_episodes(self, episode_urls: List[str], max_concurrent=2) -> List[Dict]:

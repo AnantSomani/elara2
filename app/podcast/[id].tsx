@@ -69,12 +69,12 @@ export default function PodcastDetailPage() {
       }
 
       // Navigate to episode player with the latest episode data
-      router.push({
+    router.push({
         pathname: `/episode/${latestEpisode.id}`,
-        params: {
+      params: {
           episodeData: JSON.stringify(latestEpisode),
-        },
-      });
+      },
+    });
     } catch (err) {
       Alert.alert('Error', 'Failed to fetch episode data');
       console.error(err);
@@ -208,18 +208,18 @@ export default function PodcastDetailPage() {
           ) : (
             episodes.slice(0, 3).map((episode, index) => (
               <TouchableOpacity key={episode.id} onPress={() => handleEpisodeSelect(episode)} activeOpacity={0.8}>
-                <LiquidGlassButton
-                  borderRadius={24}
-                  intensity="medium"
+                             <LiquidGlassButton 
+                 borderRadius={24} 
+                 intensity="medium" 
                   style={styles.episodeCard}
                 >
                   <View style={styles.episodeRow}>
                     <View style={styles.episodeInfo}>
                       <Text style={styles.episodeTitle} numberOfLines={2}>{episode.title}</Text>
                       <Text style={styles.episodeDate}>{formatDate(episode.datePublished)}</Text>
-                      {episode.description && (
-                        <Text style={styles.episodeDescription} numberOfLines={2}>
-                          {episode.description.replace(/<[^>]*>/g, '').trim()}
+                    {episode.description && (
+                      <Text style={styles.episodeDescription} numberOfLines={2}>
+                        {episode.description.replace(/<[^>]*>/g, '').trim()}
                         </Text>
                       )}
                     </View>
@@ -228,7 +228,7 @@ export default function PodcastDetailPage() {
                     </View>
                   </View>
                 </LiquidGlassButton>
-              </TouchableOpacity>
+                </TouchableOpacity>
             ))
           )}
         </View>

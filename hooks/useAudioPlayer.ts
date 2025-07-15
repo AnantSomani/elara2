@@ -30,23 +30,17 @@ export function useAudioPlayer(): UseAudioPlayerResult {
 
   const loadAudio = useCallback(async (uri: string) => {
     try {
-      console.log('🎵 Loading podcast audio from CDN:', uri);
+      console.log('AUDIO: Attempting to load', uri);
       setIsLoading(true);
       setError(null);
-      
-      // Validate URI format
       if (!uri || (!uri.startsWith('http://') && !uri.startsWith('https://'))) {
         throw new Error('Invalid audio URL format');
       }
-
-      // Set the audio source for expo-audio
       setAudioSource({ uri });
-      
-      console.log('✅ Audio source set successfully');
-      
+      console.log('AUDIO: Audio source set successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load audio';
-      console.error('❌ Audio loading error:', errorMessage);
+      console.error('AUDIO: loadAudio failed', errorMessage);
       setError(errorMessage);
       throw err;
     } finally {
@@ -56,27 +50,23 @@ export function useAudioPlayer(): UseAudioPlayerResult {
 
   const togglePlayback = useCallback(async () => {
     if (!player || !player.isLoaded) {
-      console.warn('⚠️ Player not ready for playback');
+      console.warn('AUDIO: Player not ready for playback', player);
       return;
     }
-
     try {
       setError(null);
-      
       if (player.playing) {
-        console.log('⏸️ Pausing playback');
+        console.log('AUDIO: Pausing playback');
         player.pause();
       } else {
-        console.log('▶️ Starting playback');
+        console.log('AUDIO: Starting playback');
         setIsBuffering(true);
         player.play();
-        
-        // Clear buffering state after a short delay
         setTimeout(() => setIsBuffering(false), 1000);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Playback error';
-      console.error('❌ Playback error:', errorMessage);
+      console.error('AUDIO: Playback error', errorMessage);
       setError(errorMessage);
       setIsBuffering(false);
     }
@@ -84,23 +74,18 @@ export function useAudioPlayer(): UseAudioPlayerResult {
 
   const seekTo = useCallback(async (positionMillis: number) => {
     if (!player || !player.isLoaded) {
-      console.warn('⚠️ Player not ready for seeking');
+      console.warn('AUDIO: Player not ready for seeking', player);
       return;
     }
-
     try {
       const positionSeconds = positionMillis / 1000;
-      console.log(`⏭️ Seeking to ${positionSeconds}s`);
-      
+      console.log(`AUDIO: Seeking to ${positionSeconds}s`);
       setIsBuffering(true);
       player.seekTo(positionSeconds);
-      
-      // Clear buffering state after seeking
       setTimeout(() => setIsBuffering(false), 500);
-      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Seek error';
-      console.error('❌ Seek error:', errorMessage);
+      console.error('AUDIO: Seek error', errorMessage);
       setError(errorMessage);
       setIsBuffering(false);
     }
@@ -108,62 +93,59 @@ export function useAudioPlayer(): UseAudioPlayerResult {
 
   const setRate = useCallback(async (rate: number) => {
     if (!player || !player.isLoaded) {
-      console.warn('⚠️ Player not ready for rate change');
+      console.warn('AUDIO: Player not ready for rate change', player);
       return;
     }
-
     try {
-      // expo-audio may not support rate changes yet
-      console.log(`🎛️ Attempting to set playback rate to ${rate}x`);
-      // player.setRate(rate); // Uncomment when expo-audio supports it
-      console.warn('⚠️ Rate setting not yet supported in expo-audio');
-      
+      console.log(`AUDIO: Attempting to set playback rate to ${rate}x`);
+      console.warn('AUDIO: Rate setting not yet supported in expo-audio');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Rate change error';
-      console.error('❌ Rate change error:', errorMessage);
+      console.error('AUDIO: Rate change error', errorMessage);
       setError(errorMessage);
     }
   }, [player]);
 
   const unload = useCallback(async () => {
     try {
-      console.log('🗑️ Unloading audio');
+      console.log('AUDIO: Unloading audio');
       setAudioSource(null);
       setError(null);
       setIsBuffering(false);
-      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unload error';
-      console.error('❌ Unload error:', errorMessage);
+      console.error('AUDIO: Unload error', errorMessage);
       setError(errorMessage);
     }
   }, []);
 
-  // Monitor player state changes and update position
   useEffect(() => {
     if (!player) return;
-
     const interval = setInterval(() => {
-      // Only update if player is loaded to avoid unnecessary re-renders
       if (player.isLoaded) {
         setForceUpdate(prev => prev + 1);
-        
-        // Clear any stale errors when playback is working
         if (player.playing && error) {
           setError(null);
         }
+        console.log('AUDIO: Player state', {
+          isLoaded: player.isLoaded,
+          playing: player.playing,
+          currentTime: player.currentTime,
+          duration: player.duration,
+        });
       }
-    }, 250); // Update every 250ms for smoother progress tracking
-
+    }, 250);
     return () => clearInterval(interval);
   }, [player, error]);
 
-  // Handle player load state changes
   useEffect(() => {
     if (player?.isLoaded) {
       setIsLoading(false);
       setIsBuffering(false);
-      console.log('✅ Audio loaded and ready for playback');
+      console.log('AUDIO: Audio loaded and ready for playback', {
+        duration: player.duration,
+        currentTime: player.currentTime,
+      });
     }
   }, [player?.isLoaded]);
 

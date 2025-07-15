@@ -61,9 +61,12 @@ class AssemblyAIPodcastProcessor:
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-            
-        # yt-dlp converts the file to .wav, so return the wav path
-        wav_path = f"{output_path}.wav"
+        
+        # Fix: yt-dlp converts to .wav and deletes the original, so return the .wav path
+        if output_path.endswith('.mp3'):
+            wav_path = output_path[:-4] + '.wav'
+        else:
+            wav_path = output_path + '.wav'
         return wav_path
     
     async def transcribe_with_assemblyai(self, audio_path: str) -> Any:
@@ -254,7 +257,7 @@ class AssemblyAIPodcastProcessor:
                 segment_data.append({
                     'episode_id': episode_id,
                     'content': segment['content'],
-                    'speaker': segment['speaker'],
+                    'speaker_name': segment['speaker'],
                     'start_time': segment['timestamp_start'],
                     'end_time': segment['timestamp_end'],
                     'embedding': segment['embedding']
@@ -313,7 +316,9 @@ class AssemblyAIPodcastProcessor:
             
             # Step 1: Download audio
             logger.info("Step 1: Downloading audio...")
-            audio_path = await self.download_audio(podcast_url, f"/tmp/{episode_id}")
+            logger.info(f"Calling download_audio with output_path: /tmp/{episode_id}")
+            base_episode_id = os.path.splitext(episode_id)[0]
+            audio_path = await self.download_audio(podcast_url, f"/tmp/{base_episode_id}")
             
             # Step 2: Transcribe and diarize with AssemblyAI
             logger.info("Step 2: Transcribing with AssemblyAI...")
@@ -362,6 +367,78 @@ class AssemblyAIPodcastProcessor:
             
         except Exception as e:
             logger.error(f"Error processing podcast: {e}")
+            # Update status to failed
+            try:
+                self.supabase.table('episodes').update({
+                    'processing_status': 'failed',
+                    'assemblyai_status': 'failed'
+                }).eq('id', episode_id).execute()
+            except:
+                pass  # Don't fail on status update error
+            raise
+
+    async def process_podcast_index_audio(self, audio_url: str, episode_id: str):
+        """Process Podcast Index audio using AssemblyAI"""
+        try:
+            # Update status to processing
+            self.supabase.table('episodes').update({
+                'processing_status': 'processing',
+                'assemblyai_status': 'processing'
+            }).eq('id', episode_id).execute()
+            
+            # Step 1: Download audio from direct URL
+            logger.info("Step 1: Downloading Podcast Index audio...")
+            logger.info(f"Calling download_audio with output_path: /tmp/{episode_id}")
+            base_episode_id = os.path.splitext(episode_id)[0]
+            audio_path = await self.download_audio(audio_url, f"/tmp/{base_episode_id}")
+            
+            # Step 2: Transcribe and diarize with AssemblyAI
+            logger.info("Step 2: Transcribing with AssemblyAI...")
+            transcript = await self.transcribe_with_assemblyai(audio_path)
+            
+            # Step 3: Extract segments with speakers
+            logger.info("Step 3: Extracting segments...")
+            segments = self.extract_segments_with_speakers(transcript)
+            
+            # Step 4: Extract chapters
+            logger.info("Step 4: Extracting chapters...")
+            chapters = self.extract_chapters(transcript)
+            
+            # Step 5: Extract entities
+            logger.info("Step 5: Extracting entities...")
+            entities = self.extract_entities(transcript)
+            
+            # Step 6: Generate embeddings
+            logger.info("Step 6: Generating embeddings...")
+            segments_with_embeddings = await self.generate_embeddings(segments)
+            
+            # Step 7: Create full transcript
+            full_transcript = " ".join([seg['text'] for seg in segments])
+            
+            # Step 8: Get processing metadata
+            metadata = self.get_processing_metadata(transcript)
+            
+            # Step 9: Save to Supabase
+            logger.info("Step 9: Saving to Supabase...")
+            await self.save_to_supabase(
+                episode_id, 
+                segments_with_embeddings, 
+                full_transcript, 
+                chapters, 
+                entities, 
+                metadata
+            )
+            
+            # Clean up temporary files
+            try:
+                os.remove(audio_path)
+            except:
+                pass
+            
+            logger.info(f"Successfully processed Podcast Index episode {episode_id}")
+            
+        except Exception as e:
+            logger.error(f"Error processing Podcast Index audio: {e}")
             # Update status to failed
             try:
                 self.supabase.table('episodes').update({

@@ -85,25 +85,25 @@ export async function processPodcastEpisode(
     }
 
     let transcriptionId: string | undefined;
-
+    
     // Start transcription if needed
     if (needsTranscription && audioUrl) {
       try {
         console.log('🎤 Starting transcription process...');
         transcriptionId = await transcribeEpisode(audioUrl, episodeId);
         console.log('✅ Transcription started with ID:', transcriptionId);
-        
+    
         // Start monitoring transcription progress
         monitorTranscriptionProgress(episodeId, transcriptionId).catch(error => {
           console.error('❌ Transcription monitoring failed:', error);
-        });
+    });
         
       } catch (error) {
         console.error('❌ Failed to start transcription:', error);
         // Don't throw - episode can still be used without transcription
       }
     }
-
+    
     return {
       episodeId,
       transcriptionStarted: needsTranscription,
@@ -141,9 +141,9 @@ async function monitorTranscriptionProgress(episodeId: string, transcriptId: str
           console.log('🎉 Transcription completed! Processing final result...');
           await assemblyAIService.processCompletedTranscription(episodeId, transcriptId);
           console.log('✅ Transcription processing complete');
-          return;
-        }
-        
+      return;
+    }
+
         if (status.status === 'error') {
           console.error('❌ Transcription failed:', status.error);
           return;
@@ -215,7 +215,7 @@ export async function sendQuestion(
   try {
     console.log('💬 Processing question for episode:', episodeId);
     console.log('❓ Question:', question);
-
+    
     // Get episode data
     const episode = await getEpisode(episodeId);
     if (!episode) {
@@ -230,7 +230,7 @@ export async function sendQuestion(
       try {
         console.log('🔍 Searching transcript for relevant content...');
         relevantSegments = await searchTranscript(episodeId, question);
-        
+    
         if (relevantSegments.length > 0) {
           console.log(`✅ Found ${relevantSegments.length} relevant transcript segments`);
           contextText = relevantSegments

@@ -117,17 +117,17 @@ export default function HomePage() {
               style={styles.searchInput}
               returnKeyType="search"
             />
-            <Pressable
-              style={({ pressed }) => [
+          <Pressable
+            style={({ pressed }) => [
                 styles.searchButton,
                 {
                   backgroundColor: pressed ? 'rgba(174,239,255,0.8)' : 'rgba(174,239,255,0.6)',
-                },
-              ]}
+              },
+            ]}
               onPress={handlePodcastSearch}
-            >
+          >
               <Text style={styles.searchButtonText}>Search</Text>
-            </Pressable>
+          </Pressable>
           </View>
         </LiquidGlassButton>
 
