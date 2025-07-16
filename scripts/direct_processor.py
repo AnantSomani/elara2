@@ -212,10 +212,10 @@ class DirectPodcastProcessor(AssemblyAIPodcastProcessor):
             # Use guid as the episode ID
             episode_id = episode_data.guid
             
-            # Check if episode already exists
+            # Check if episode already exists by podcast_index_guid
             result = self.supabase.table('episodes')\
                 .select('id')\
-                .eq('id', episode_id)\
+                .eq('podcast_index_guid', episode_data.guid)\
                 .execute()
             
             if result.data:

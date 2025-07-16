@@ -28,6 +28,34 @@ export interface EpisodeProcessResult {
   transcriptionId?: string;
 }
 
+export interface PodcastIndexEpisodeData {
+  guid: string;
+  enclosureUrl: string;
+  title: string;
+  description?: string;
+  duration?: number;
+  pubDate?: string;
+  imageUrl?: string;
+  podcastTitle?: string;
+  episodeType?: string;
+  explicit?: boolean;
+}
+
+export interface PodcastIndexProcessResult {
+  episodeId: string;
+  status: string;
+  message: string;
+  startedAt: string;
+}
+
+export interface PodcastIndexStatusResult {
+  episodeId: string;
+  processingStatus: string;
+  createdAt?: string;
+  updatedAt?: string;
+  errorMessage?: string;
+}
+
 /**
  * Process a podcast episode for transcription and AI chat
  * This creates or updates episode data and starts transcription if needed
@@ -310,6 +338,98 @@ export async function startTranscription(episodeId: string, audioUrl: string): P
     
   } catch (error) {
     console.error('❌ Error starting transcription:', error);
+    throw error;
+  }
+} 
+
+/**
+ * Process a Podcast Index episode using the FastAPI backend
+ */
+export async function processPodcastIndexEpisode(
+  episodeData: PodcastIndexEpisodeData,
+  forceReprocess: boolean = false
+): Promise<PodcastIndexProcessResult> {
+  try {
+    console.log('🎙️ Processing Podcast Index episode...');
+    console.log('📹 Episode:', episodeData.title);
+    console.log('🔗 Audio URL:', episodeData.enclosureUrl);
+    
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    
+    const response = await axios.post(`${apiBaseUrl}/process-podcast-index`, {
+      episode_data: episodeData,
+      episode_id: null, // Let the API generate one
+      force_reprocess: forceReprocess
+    });
+    
+    console.log('✅ Podcast Index processing started:', response.data);
+    return response.data;
+    
+  } catch (error) {
+    console.error('❌ Error processing Podcast Index episode:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to process Podcast Index episode: ${errorMessage}`);
+  }
+}
+
+/**
+ * Check the processing status of a Podcast Index episode
+ */
+export async function getPodcastIndexStatus(episodeId: string): Promise<PodcastIndexStatusResult> {
+  try {
+    console.log('📊 Checking Podcast Index processing status for:', episodeId);
+    
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    
+    const response = await axios.get(`${apiBaseUrl}/status/${episodeId}`);
+    
+    console.log('✅ Status retrieved:', response.data);
+    return response.data;
+    
+  } catch (error) {
+    console.error('❌ Error checking Podcast Index status:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to check Podcast Index status: ${errorMessage}`);
+  }
+}
+
+/**
+ * Poll the processing status until completion or failure
+ */
+export async function pollPodcastIndexStatus(
+  episodeId: string, 
+  maxAttempts: number = 30,
+  intervalMs: number = 2000
+): Promise<PodcastIndexStatusResult> {
+  try {
+    console.log('🔄 Polling Podcast Index processing status...');
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`📊 Polling attempt ${attempt}/${maxAttempts}...`);
+      
+      const status = await getPodcastIndexStatus(episodeId);
+      
+      if (status.processingStatus === 'completed') {
+        console.log('🎉 Podcast Index processing completed!');
+        return status;
+      }
+      
+      if (status.processingStatus === 'failed') {
+        console.error('❌ Podcast Index processing failed:', status.errorMessage);
+        return status;
+      }
+      
+      if (attempt < maxAttempts) {
+        console.log(`⏳ Still processing... waiting ${intervalMs}ms before next check`);
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+      }
+    }
+    
+    console.warn('⚠️ Polling timeout - processing may still be in progress');
+    return await getPodcastIndexStatus(episodeId);
+    
+  } catch (error) {
+    console.error('❌ Error polling Podcast Index status:', error);
     throw error;
   }
 } 
