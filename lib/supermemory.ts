@@ -78,6 +78,9 @@ export class SupermemoryClient {
     if (!this.apiKey) {
       console.warn('⚠️ Supermemory API key not found in environment variables');
     }
+    // Add logging for debugging
+    console.log('Supermemory API Key:', this.apiKey ? this.apiKey.slice(0, 8) + '...' : 'NOT SET');
+    console.log('Supermemory Base URL:', this.baseUrl);
   }
 
   /**

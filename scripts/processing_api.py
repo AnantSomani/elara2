@@ -12,6 +12,10 @@ from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, HttpUrl
 
+# Load environment variables from .env.local
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=".env.local")
+
 try:
     from fastapi import FastAPI, HTTPException, BackgroundTasks
     from fastapi.middleware.cors import CORSMiddleware

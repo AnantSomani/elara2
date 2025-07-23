@@ -15,6 +15,9 @@ export interface SupermemoryChatMessage {
   memoryCount?: number;
   searchTime?: number;
   contextSummary?: string;
+  // Add these for compatibility with frontend
+  memoryResults?: import('../lib/supermemory').SupermemorySearchResult[];
+  usedMemorySearch?: boolean;
 }
 
 export interface SupermemoryChatOptions {
@@ -99,27 +102,26 @@ export function useSupermemoryChat(
 
       // Prepare search options
       const searchOptions: SupermemorySearchOptions = {
-        speaker: messageOptions?.speaker || currentSpeaker,
-        scope: messageOptions?.scope || currentScope,
-        enableInfiniteChat: isInfiniteChatEnabled,
+        speaker_name: messageOptions?.speaker_name || currentSpeaker,
+        episodeId: episodeId,
         sessionId: isInfiniteChatEnabled ? sessionId : undefined,
-        maxMemories: messageOptions?.maxMemories || options.maxMemories || 10,
+        limit: messageOptions?.limit || options.maxMemories || 10,
       };
 
       // Send question with Supermemory
-      const response = await sendQuestionWithSupermemory(episodeId, question, searchOptions);
+      const response = await sendQuestionWithSupermemory(question, episodeId, searchOptions);
 
       // Update with actual response
       const responseMessage: SupermemoryChatMessage = {
         id: responseId,
         type: 'response',
         content: response.answer,
-        audioUrl: response.audioUrl,
         timestamp: new Date(),
         isLoading: false,
-        memoryCount: response.memoryCount,
-        searchTime: response.searchTime,
-        contextSummary: response.contextSummary,
+        memoryCount: response.memories?.length || 0,
+        contextSummary: response.summary,
+        memoryResults: response.memories,
+        usedMemorySearch: !!(response.memories && response.memories.length > 0),
       };
 
       setMessages(prev => 
@@ -186,6 +188,21 @@ export function useSupermemoryChat(
       messageCount: responseMessages.length,
       totalMemories,
       averageSearchTime: Math.round(averageSearchTime),
+    };
+  }, [messages]);
+
+  // Add a getMemorySearchStats function for compatibility
+  const getMemorySearchStats = useCallback(() => {
+    const responseMessages = messages.filter(msg => msg.type === 'response' && !msg.isLoading);
+    const totalSearches = responseMessages.length;
+    const memorySearches = responseMessages.filter(msg => msg.usedMemorySearch).length;
+    const fallbackSearches = totalSearches - memorySearches;
+    const averageMemoryResults = totalSearches > 0 ? Math.round(responseMessages.reduce((sum, msg) => sum + (msg.memoryResults?.length || 0), 0) / totalSearches) : 0;
+    return {
+      totalSearches,
+      memorySearches,
+      fallbackSearches,
+      averageMemoryResults,
     };
   }, [messages]);
 

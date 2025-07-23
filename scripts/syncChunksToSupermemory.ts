@@ -87,9 +87,9 @@ class SupermemorySync {
       const episode = await getEpisodeData(segment.episode_id);
       
       return {
-        text: segment.content,
+        content: segment.content, // Use 'content' instead of 'text'
         metadata: {
-          speaker: segment.speaker,
+          speaker_name: segment.speaker, // Use 'speaker_name' to match our schema
           timestamp: new Date(segment.created_at).toISOString(),
           episode_id: segment.episode_id,
           podcast_title: episode?.podcastTitle || 'Unknown Podcast',
@@ -99,6 +99,8 @@ class SupermemorySync {
           start_time: segment.start_time,
           end_time: segment.end_time,
         },
+        containerTags: ['elara', 'podcast', 'transcript'], // Add container tags
+        userId: 'elara-user', // Add user ID
       };
     } catch (error) {
       console.error('❌ Error transforming segment:', error);
@@ -137,47 +139,51 @@ class SupermemorySync {
         return;
       }
 
-      // Create memories in Supermemory
-      let retries = 0;
-      let success = false;
+      // Create memories individually in Supermemory
+      console.log(`📝 Creating ${memories.length} memories in Supermemory...`);
+      
+      for (let i = 0; i < memories.length; i++) {
+        const memory = memories[i];
+        const segment = segments[i];
+        let retries = 0;
+        let success = false;
 
-      while (retries < this.maxRetries && !success) {
-        try {
-          const memoryIds = await supermemoryClient.batchCreateMemories(memories);
-          
-          // Update database with success status
-          for (let i = 0; i < segments.length; i++) {
-            const segment = segments[i];
-            const memoryId = memoryIds[i];
+        while (retries < this.maxRetries && !success) {
+          try {
+            const memoryId = await supermemoryClient.createMemory(memory);
             
-            if (memoryId) {
-              await this.updateSegmentStatus(segment.id, 'completed', memoryId);
-              this.progress.synced++;
+            // Update database with success status
+            await this.updateSegmentStatus(segment.id, 'completed', memoryId);
+            this.progress.synced++;
+            success = true;
+            
+            console.log(`✅ Created memory ${memoryId} for segment ${segment.id}`);
+            
+          } catch (error) {
+            retries++;
+            console.error(`❌ Failed to create memory for segment ${segment.id} (attempt ${retries}/${this.maxRetries}):`, error);
+            
+            if (retries >= this.maxRetries) {
+              // Mark segment as failed
+              await this.updateSegmentStatus(segment.id, 'failed');
+              this.progress.failed++;
+              console.error(`❌ Segment ${segment.id} failed after ${this.maxRetries} attempts`);
             } else {
-              await this.updateSegmentStatus(segment.id, 'failed');
-              this.progress.failed++;
+              // Wait before retry with exponential backoff
+              const delay = Math.min(1000 * Math.pow(2, retries - 1), 10000); // Max 10 seconds
+              console.log(`⏳ Waiting ${delay}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
             }
-          }
-          
-          success = true;
-          console.log(`✅ Successfully synced ${memories.length} segments to Supermemory`);
-          
-        } catch (error) {
-          retries++;
-          console.error(`❌ Batch sync failed (attempt ${retries}/${this.maxRetries}):`, error);
-          
-          if (retries >= this.maxRetries) {
-            // Mark all segments as failed
-            for (const segment of segments) {
-              await this.updateSegmentStatus(segment.id, 'failed');
-              this.progress.failed++;
-            }
-          } else {
-            // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
           }
         }
+
+        // Small delay between individual memory creations to avoid rate limiting
+        if (i < memories.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
+
+      console.log(`✅ Batch sync completed: ${this.progress.synced} synced, ${this.progress.failed} failed`);
 
     } catch (error) {
       console.error('❌ Error syncing batch:', error);

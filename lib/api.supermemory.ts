@@ -91,7 +91,8 @@ User Question: ${question}
 Please provide a comprehensive answer based on the podcast content above. If the content doesn't contain enough information to answer the question, say so. Be conversational and helpful.`;
 
     // Call the AI service (using existing API)
-    const response = await fetch('/api/chat', {
+    const apiUrl = '/api/chat';
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -101,12 +102,20 @@ Please provide a comprehensive answer based on the podcast content above. If the
         episodeId: episodeId,
       }),
     });
-
+    const text = await response.text();
+    console.log('API URL:', apiUrl);
+    console.log('Status:', response.status);
+    console.log('Raw response:', text);
     if (!response.ok) {
-      throw new Error(`AI API error: ${response.status}`);
+      throw new Error(`API error: ${response.status} - ${text}`);
     }
-
-    const aiResponse = await response.json();
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(text);
+    } catch (e) {
+      console.error('Failed to parse JSON. Raw response was:', text);
+      throw e;
+    }
     const answer = aiResponse.answer || aiResponse.content || 'I could not generate a response.';
 
     // Update session memory if session ID provided

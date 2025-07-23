@@ -127,12 +127,12 @@ export function useAudioPlayer(): UseAudioPlayerResult {
         if (player.playing && error) {
           setError(null);
         }
-        console.log('AUDIO: Player state', {
-          isLoaded: player.isLoaded,
-          playing: player.playing,
-          currentTime: player.currentTime,
-          duration: player.duration,
-        });
+        // console.log('AUDIO: Player state', {
+        //   isLoaded: player.isLoaded,
+        //   playing: player.playing,
+        //   currentTime: player.currentTime,
+        //   duration: player.duration,
+        // });
       }
     }, 250);
     return () => clearInterval(interval);

@@ -16,6 +16,7 @@
     "@types/crypto-js": "^4.2.2",
     "axios": "^1.7.7",
     "crypto-js": "^4.2.0",
+    "csvtojson": "^2.0.10",
     "dotenv": "^17.2.0",
     "expo": "^53.0.15",
     "expo-audio": "^0.4.8",
@@ -46,7 +47,9 @@
     "@types/react": "~19.0.10",
     "@types/react-native": "~0.73.0",
     "tailwindcss": "3.3.2",
+    "ts-node": "^10.9.2",
     "typescript": "~5.8.3"
   },
-  "private": true
+  "private": true,
+  "type": "commonjs"
 }

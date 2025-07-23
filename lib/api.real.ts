@@ -5,6 +5,7 @@ import { rewriteQuestion } from './claude';
 import { synthesizeSpeech, getHostVoiceId, getHostVoiceSettings } from './vogent';
 import { getHostPrompt } from '../constants/prompts';
 import { transcribeEpisode, checkTranscriptionStatus, searchTranscript, type TranscriptSegment } from './assemblyai';
+import { supermemoryClient, type SupermemorySearchResult } from './supermemory';
 
 // Get environment variables for debugging
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -20,6 +21,8 @@ export interface QuestionResponse {
   audioUrl: string;
   hostVoice: string;
   relevantSegments?: TranscriptSegment[];
+  memoryResults?: SupermemorySearchResult[];
+  usedMemorySearch?: boolean;
 }
 
 export interface EpisodeProcessResult {
@@ -235,6 +238,7 @@ export async function getEpisodeData(episodeId: string): Promise<EpisodeData> {
 
 /**
  * Send a question about an episode and get AI response with transcript context
+ * Now enhanced with Supermemory search for better context and long-term memory
  */
 export async function sendQuestion(
   episodeId: string, 
@@ -250,11 +254,43 @@ export async function sendQuestion(
       throw new Error('Episode not found');
     }
 
-    // Check if transcription is available
-    let relevantSegments: TranscriptSegment[] = [];
+    // Try Supermemory search first for enhanced context
+    let memoryResults: SupermemorySearchResult[] = [];
+    let usedMemorySearch = false;
     let contextText = '';
     
-    if (episode.transcriptionStatus === 'completed') {
+    try {
+      console.log('🧠 Searching Supermemory for relevant memories...');
+      memoryResults = await supermemoryClient.searchMemories(question, {
+        documentThreshold: 0.3,
+        limit: 5,
+        containerTags: ['elara_podcast'],
+        userId: 'elara_user'
+      });
+      
+      if (memoryResults.length > 0) {
+        usedMemorySearch = true;
+        console.log(`✅ Found ${memoryResults.length} relevant memories in Supermemory`);
+        
+        // Build context from memory chunks
+        const memoryContexts = memoryResults.map(memory => {
+          const chunks = memory.chunks?.filter(chunk => chunk.isRelevant) || [];
+          return chunks.map(chunk => chunk.content).join(' ');
+        }).filter(text => text.length > 0);
+        
+        contextText = memoryContexts.join(' ');
+        console.log(`📝 Memory context length: ${contextText.length} characters`);
+      } else {
+        console.log('⚠️ No relevant memories found in Supermemory, falling back to transcript search');
+      }
+    } catch (error) {
+      console.warn('⚠️ Supermemory search failed, falling back to transcript search:', error);
+    }
+
+    // Fallback to transcript search if no memories found
+    let relevantSegments: TranscriptSegment[] = [];
+    
+    if (!usedMemorySearch && episode.transcriptionStatus === 'completed') {
       try {
         console.log('🔍 Searching transcript for relevant content...');
         relevantSegments = await searchTranscript(episodeId, question);
@@ -270,24 +306,31 @@ export async function sendQuestion(
       }
     }
 
-    // Generate AI response with transcript context
-    console.log('🤖 Generating AI response...');
+    // Generate AI response with enhanced context
+    console.log('🤖 Generating AI response with memory-aware context...');
     
     const questionText = question;
     const episodeContext = contextText || `Episode: ${episode.title}`;
     const hostName = 'Host';
-    const hostStyle = 'You are a knowledgeable podcast host. Provide helpful, accurate responses based on the episode content.';
+    
+    // Enhanced host style with memory awareness
+    const hostStyle = usedMemorySearch 
+      ? 'You are a knowledgeable podcast host with access to a comprehensive memory of podcast content. Provide helpful, accurate responses based on the episode content and related memories. Reference specific details from the memories when relevant.'
+      : 'You are a knowledgeable podcast host. Provide helpful, accurate responses based on the episode content.';
 
     const response = await generateHostResponse(questionText, episodeContext, hostName, hostStyle);
     
     console.log('✅ AI response generated');
+    console.log(`📊 Used ${usedMemorySearch ? 'Supermemory' : 'transcript'} search for context`);
     
     // For now, return without audio synthesis to focus on text responses
     return {
       answer: response,
       audioUrl: '', // Will implement audio synthesis later
       hostVoice: 'Host',
-      relevantSegments: relevantSegments.length > 0 ? relevantSegments : undefined,
+      relevantSegments: !usedMemorySearch && relevantSegments.length > 0 ? relevantSegments : undefined,
+      memoryResults: usedMemorySearch && memoryResults.length > 0 ? memoryResults : undefined,
+      usedMemorySearch,
     };
 
   } catch (error) {
