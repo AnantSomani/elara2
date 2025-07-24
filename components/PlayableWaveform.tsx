@@ -19,14 +19,11 @@ const PlayableWaveform: React.FC<PlayableWaveformProps> = ({
   size = 60,
   color = 'rgba(80,120,255,0.92)',
 }) => {
-  // Debug prop changes
-  useEffect(() => {
-    console.log('🎵 PlayableWaveform received props:', { isPlaying, isLoading });
-  }, [isPlaying, isLoading]);
+  // Removed debug prop change logging
+  useEffect(() => {}, [isPlaying, isLoading]);
 
   const handlePress = () => {
-    console.log('🎵 PlayableWaveform: Button pressed!');
-    console.log('🎵 Current state before toggle:', { isPlaying, isLoading });
+    // Removed debug button press logging
     onTogglePlayback();
   };
 
