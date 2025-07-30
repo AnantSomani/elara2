@@ -256,14 +256,42 @@ export async function sendQuestion(
     
     if (episode.transcriptionStatus === 'completed') {
       try {
-        console.log('🔍 Searching transcript for relevant content...');
-        relevantSegments = await searchTranscript(episodeId, question);
-    
-        if (relevantSegments.length > 0) {
-          console.log(`✅ Found ${relevantSegments.length} relevant transcript segments`);
+        console.log('🔍 Performing semantic search for relevant content...');
+        
+        // Generate embedding for the question
+        const questionEmbedding = await generateEmbedding(question);
+        
+        // Use semantic search with embeddings
+        const segments = await searchSegments(episodeId, questionEmbedding, 0.6, 5);
+        
+        if (segments.length > 0) {
+          console.log(`✅ Found ${segments.length} relevant transcript segments via semantic search`);
+          
+          // Convert SegmentData to TranscriptSegment format
+          relevantSegments = segments.map(segment => ({
+            id: segment.id.toString(),
+            text: segment.content,
+            start: segment.startTime,
+            end: segment.endTime,
+            confidence: 0.9, // Default confidence for semantic matches
+            speaker: segment.speakerName || segment.speaker || 'Unknown'
+          }));
+          
           contextText = relevantSegments
-            .map(segment => segment.text)
+            .map(segment => `${segment.speaker}: ${segment.text}`)
             .join(' ');
+        } else {
+          console.log('⚠️ No semantic matches found, trying text search as fallback...');
+          
+          // Fallback to text search
+          relevantSegments = await searchTranscript(episodeId, question);
+          
+          if (relevantSegments.length > 0) {
+            console.log(`✅ Found ${relevantSegments.length} relevant segments via text search`);
+            contextText = relevantSegments
+              .map(segment => segment.text)
+              .join(' ');
+          }
         }
       } catch (error) {
         console.warn('⚠️ Could not search transcript:', error);

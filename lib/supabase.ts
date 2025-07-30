@@ -237,25 +237,68 @@ export async function searchSegments(
   similarityThreshold: number = 0.7,
   matchCount: number = 5
 ): Promise<SegmentData[]> {
-  const { data, error } = await supabase.rpc('search_segments', {
-    target_episode_id: episodeId,
-    query_embedding: JSON.stringify(queryEmbedding),
-    similarity_threshold: similarityThreshold,
-    match_count: matchCount,
-  });
+  try {
+    console.log(`🔍 Searching segments for episode ${episodeId} with threshold ${similarityThreshold}`);
+    
+    // First try the search_segments function
+    const { data, error } = await supabase.rpc('search_segments', {
+      target_episode_id: episodeId,
+      query_embedding: queryEmbedding,
+      similarity_threshold: similarityThreshold,
+      match_count: matchCount,
+    });
 
-  if (error) throw error;
+    if (error) {
+      console.warn('⚠️ search_segments function failed, trying direct vector query:', error.message);
+      
+      // Fallback to direct vector similarity query
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('transcript_segments')
+        .select('id, content, speaker_name, start_time, end_time')
+        .eq('episode_id', episodeId)
+        .order(`embedding <-> '[${queryEmbedding.join(',')}]'::vector`)
+        .limit(matchCount);
 
-  return data.map((segment: any) => ({
-    id: segment.id,
-    episodeId: episodeId,
-    content: segment.content,
-    speaker: segment.speaker_name || 'Unknown', // Map speaker_name to speaker for compatibility
-    speakerName: segment.speaker_name,
-    startTime: segment.start_time,
-    endTime: segment.end_time,
-    embedding: undefined, // Not returned in search results
-  }));
+      if (fallbackError) {
+        console.error('❌ Direct vector query also failed:', fallbackError.message);
+        throw new Error(`Vector search failed: ${fallbackError.message}`);
+      }
+
+      // Convert fallback results to SegmentData format
+      return fallbackData.map((segment: any) => ({
+        id: segment.id,
+        episodeId: episodeId,
+        content: segment.content,
+        speaker: segment.speaker_name || 'Unknown',
+        speakerName: segment.speaker_name,
+        startTime: segment.start_time,
+        endTime: segment.end_time,
+        embedding: undefined,
+      }));
+    }
+
+    if (!data || data.length === 0) {
+      console.log('📭 No segments found matching the query');
+      return [];
+    }
+
+    console.log(`✅ Found ${data.length} relevant segments`);
+    
+    return data.map((segment: any) => ({
+      id: segment.id,
+      episodeId: episodeId,
+      content: segment.content,
+      speaker: segment.speaker_name || 'Unknown',
+      speakerName: segment.speaker_name,
+      startTime: segment.start_time,
+      endTime: segment.end_time,
+      embedding: undefined, // Not returned in search results
+    }));
+
+  } catch (error) {
+    console.error('❌ Error in searchSegments:', error);
+    throw error;
+  }
 }
 
 /**
