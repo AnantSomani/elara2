@@ -15,6 +15,13 @@ export const sendQuestion = api.sendQuestion;
 export const processPodcastIndexEpisode = api.processPodcastIndexEpisode;
 export const getPodcastIndexStatus = api.getPodcastIndexStatus;
 export const pollPodcastIndexStatus = api.pollPodcastIndexStatus;
+
+// Export new retrieval functionality
+export { retrievalManager } from './retrievalManager';
+export { realTimeDataToolRegistry } from './realTimeData';
+export { PerplexityClient } from './perplexity';
+export { knowledgeGraphClient } from './knowledgeGraph';
+
 export type { 
   EpisodeProcessResult, 
   QuestionResponse,
@@ -22,3 +29,16 @@ export type {
   PodcastIndexProcessResult,
   PodcastIndexStatusResult
 } from './api.real';
+
+export type {
+  RetrievalResult,
+  RetrievalContext
+} from './retrievalManager';
+
+export type {
+  RealTimeDataResult
+} from './realTimeData';
+
+export type {
+  PerplexitySearchResult
+} from './perplexity';
