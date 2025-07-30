@@ -35,6 +35,10 @@ export interface EpisodeData {
   episodeChapters?: any[];
   detectedEntities?: any[];
   processingMetadata?: any;
+  // Metadata caching fields
+  podcastIndexMetadata?: any;    // Cached Podcast Index metadata
+  lastMetadataUpdate?: string;   // Timestamp of last metadata update
+  metadataSource?: string;       // Source of metadata
   createdAt?: string;
   updatedAt?: string;
 }
@@ -86,6 +90,7 @@ export interface CreateEpisodeData {
   episodeType?: string;
   explicit?: boolean;
   podcastTitle?: string;
+  podcastIndexMetadata?: any;    // Optional Podcast Index metadata
 }
 
 /**
@@ -135,6 +140,38 @@ export async function createEpisode(episodeData: CreateEpisodeData): Promise<str
 }
 
 /**
+ * Create a new episode record in Supabase with enhanced metadata support
+ */
+export async function createEpisodeWithMetadata(
+  episodeData: CreateEpisodeData,
+  podcastIndexMetadata?: any
+): Promise<string> {
+  const episodeId = episodeData.id || generateId();
+  
+  const enrichedData = {
+    ...episodeData,
+    id: episodeId,
+    podcast_index_metadata: podcastIndexMetadata || null,
+    last_metadata_update: new Date().toISOString(),
+    metadata_source: podcastIndexMetadata ? 'podcast_index' : 'manual'
+  };
+
+  const { error } = await supabase
+    .from('episodes')
+    .insert(enrichedData);
+
+  if (error) throw error;
+  return episodeId;
+}
+
+/**
+ * Generate a unique ID for episodes
+ */
+function generateId(): string {
+  return 'ep_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+/**
  * Get episode data by ID
  */
 export async function getEpisode(episodeId: string): Promise<EpisodeData> {
@@ -176,6 +213,9 @@ export async function getEpisode(episodeId: string): Promise<EpisodeData> {
       explicit: data.explicit,
       podcastTitle: data.channel_title,
       processingStatus: data.processing_status,
+      podcastIndexMetadata: data.podcast_index_metadata,
+      lastMetadataUpdate: data.last_metadata_update,
+      metadataSource: data.metadata_source,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     };
@@ -348,10 +388,87 @@ export function subscribeToEpisode(episodeId: string, callback: (episode: Episod
           explicit: data.explicit,
           podcastTitle: data.channel_title,
           processingStatus: data.processing_status,
+          podcastIndexMetadata: data.podcast_index_metadata,
+          lastMetadataUpdate: data.last_metadata_update,
+          metadataSource: data.metadata_source,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
         });
       }
     )
     .subscribe();
+}
+
+/**
+ * Get or cache podcast metadata
+ */
+export async function getPodcastMetadata(podcastId: string): Promise<any> {
+  // First check cache
+  const { data: cached, error: cacheError } = await supabase
+    .from('podcast_metadata_cache')
+    .select('*')
+    .eq('podcast_id', podcastId)
+    .single();
+
+  if (cached && !cacheError) {
+    const cacheAge = Date.now() - new Date(cached.last_updated).getTime();
+    const isFresh = cacheAge < 24 * 60 * 60 * 1000; // 24 hours
+
+    if (isFresh) {
+      console.log('✅ Using cached podcast metadata');
+      return cached;
+    }
+  }
+
+  // Fetch fresh metadata from Podcast Index (this would be implemented)
+  console.log('🔄 Fetching fresh podcast metadata from Podcast Index');
+  // TODO: Implement Podcast Index API call here
+  
+  return null;
+}
+
+/**
+ * Update episode metadata
+ */
+export async function updateEpisodeMetadata(
+  episodeId: string, 
+  metadata: any, 
+  source: string = 'podcast_index'
+): Promise<void> {
+  const { error } = await supabase
+    .from('episodes')
+    .update({
+      podcast_index_metadata: metadata,
+      last_metadata_update: new Date().toISOString(),
+      metadata_source: source
+    })
+    .eq('id', episodeId);
+
+  if (error) throw error;
+}
+
+/**
+ * Cache podcast metadata
+ */
+export async function cachePodcastMetadata(
+  podcastId: string, 
+  metadata: any
+): Promise<void> {
+  const { error } = await supabase
+    .from('podcast_metadata_cache')
+    .upsert({
+      podcast_id: podcastId,
+      title: metadata.title,
+      description: metadata.description,
+      author: metadata.author,
+      categories: metadata.categories,
+      language: metadata.language,
+      explicit: metadata.explicit,
+      episode_count: metadata.episode_count,
+      last_updated: new Date().toISOString()
+    }, {
+      onConflict: 'podcast_id'
+    });
+
+  if (error) throw error;
 } 
